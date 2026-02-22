@@ -1,0 +1,42 @@
+[project]
+name = "tscbench"
+requires-python = ">=3.12"
+dependencies = [
+    # TSCGlue publishes its package under the name "autotsc"
+    "autotsc @ git+https://github.com/gasperpetelin/TSCGlue",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "isort",
+    "pytest",
+    "s3fs",
+    "boto3",
+    "awscli",
+    "moto[s3]",
+]
+notebooks = [
+    "jupyter",
+    "jupyterlab",
+    "ipykernel",
+    "hvplot",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["N803", "N806"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
