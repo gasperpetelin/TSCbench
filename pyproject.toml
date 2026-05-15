@@ -1,9 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "tscbench"
-requires-python = ">=3.12"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
 dependencies = [
-    # TSCGlue publishes its package under the name "autotsc"
-    "autotsc @ git+https://github.com/gasperpetelin/TSCGlue",
+    "tscglue==0.1.2",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +27,17 @@ notebooks = [
     "hvplot",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["tscbench"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/tscbench",
+    "/scripts",
+    "/README.md",
+    "/pyproject.toml",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -40,3 +55,6 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.uv.sources]
+tscglue = { path = "../TSCGlue", editable = true }
