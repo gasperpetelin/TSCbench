@@ -6,13 +6,9 @@ build-backend = "hatchling.build"
 name = "tscbench"
 version = "0.1.0"
 requires-python = ">=3.12,<3.14"
-dependencies = [
-    "tscglue",
-]
+dependencies = []
 
 [project.optional-dependencies]
-cpu = ["tscglue[cpu]"]
-cu124 = ["tscglue[cu124]"]
 dev = [
     "ruff",
     "isort",
@@ -59,13 +55,3 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
-[tool.uv]
-conflicts = [
-    [
-        { extra = "cpu" },
-        { extra = "cu124" },
-    ],
-]
-
-[tool.uv.sources]
-tscglue = { git = "https://github.com/gasperpetelin/TSCGlue", branch = "main" }

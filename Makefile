@@ -7,16 +7,22 @@ help:   ## Show available commands
 install-uv:  ## Install uv package manager
 	curl -LsSf https://astral.sh/uv/install.sh | sh
 
-setup:  ## Install base dependencies (no PyTorch)
+setup:  ## Install base dependencies + tscglue (no PyTorch)
+	rm -f uv.lock
 	uv sync
+	uv pip install "tscglue @ git+https://github.com/gasperpetelin/TSCGlue@main"
 
 setup-cpu:  ## Install tscglue with CPU PyTorch
-	uv sync --extra cpu
+	rm -f uv.lock
+	uv sync
 	uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+	uv pip install "tscglue[cpu] @ git+https://github.com/gasperpetelin/TSCGlue@main"
 
 setup-cuda:  ## Install tscglue with CUDA 12.4 PyTorch
-	uv sync --extra cu124
+	rm -f uv.lock
+	uv sync
 	uv pip install torch --index-url https://download.pytorch.org/whl/cu124
+	uv pip install "tscglue[cu124] @ git+https://github.com/gasperpetelin/TSCGlue@main"
 
 list:
 	@LC_ALL=C $(MAKE) -pRrq -f $(firstword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/(^|\n)# Files(\n|$$)/,/(^|\n)# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | grep -E -v -e '^[^[:alnum:]]' -e '^$$@$$'
