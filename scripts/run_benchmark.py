@@ -28,15 +28,16 @@ from tscglue.models import TSCGlueClassifier
 from tscbench.utils import LocalFileCache, LogsFileCache, S3FileCache, _DEFAULT_DATA_DIR, discover_datasets, hardware_info, load_ucr_fold, software_versions
 
 
-def run_metadata(n_jobs: int) -> dict:
+def run_metadata(n_jobs: int, n_gpus: int) -> dict:
     return {
         "n_jobs": n_jobs,
+        "n_gpus": n_gpus,
         "hardware": hardware_info(),
         "versions": software_versions(),
     }
 
 
-def get_model(model_name: str, random_state: int, n_jobs: int):
+def get_model(model_name: str, random_state: int, n_jobs: int, n_gpus: int):
     if model_name == "rocket":
         return RocketClassifier(random_state=random_state, n_jobs=n_jobs)
     if model_name == "minirocket":
@@ -44,7 +45,7 @@ def get_model(model_name: str, random_state: int, n_jobs: int):
     if model_name == "catch22":
         return Catch22Classifier(random_state=random_state, n_jobs=n_jobs)
     if model_name == "tscglue":
-        return TSCGlueClassifier(random_state=random_state, n_jobs=n_jobs)
+        return TSCGlueClassifier(random_state=random_state, n_jobs=n_jobs, n_gpus=n_gpus)
     raise ValueError(f"Unknown model name: {model_name}")
 
 
@@ -65,9 +66,10 @@ def make_cache(storage: str, output_dir: Path, s3_uri: str):
 @click.option("--storage", type=click.Choice(["disk", "s3", "logs"]), default="logs", show_default=True)
 @click.option("--s3-uri", default="s3://tsc-bench/performance-benchmarking", show_default=True)
 @click.option("-j", "--n-jobs", default=8, show_default=True, type=int)
+@click.option("-g", "--n-gpus", default=0, show_default=True, type=int)
 @click.option("--overwrite", is_flag=True)
 @click.option("--list-datasets", is_flag=True)
-def main(models, dataset_names, fold_spec, output_dir, storage, s3_uri, n_jobs, overwrite, list_datasets):
+def main(models, dataset_names, fold_spec, output_dir, storage, s3_uri, n_jobs, n_gpus, overwrite, list_datasets):
     local_datasets = discover_datasets(_DEFAULT_DATA_DIR)
 
     if list_datasets:
@@ -82,7 +84,7 @@ def main(models, dataset_names, fold_spec, output_dir, storage, s3_uri, n_jobs, 
         raise click.UsageError("No datasets found. Pass --datasets or add data to --data-dir.")
 
     cache = make_cache(storage, output_dir, s3_uri)
-    metadata = run_metadata(n_jobs=n_jobs)
+    metadata = run_metadata(n_jobs=n_jobs, n_gpus=n_gpus)
 
     click.echo(f"Models:   {', '.join(model_names)}")
     click.echo(f"Datasets: {', '.join(datasets)}")
@@ -97,7 +99,7 @@ def main(models, dataset_names, fold_spec, output_dir, storage, s3_uri, n_jobs, 
         for model_name, fold in product(model_names, folds):
             model = None
             try:
-                model = get_model(model_name, random_state=fold, n_jobs=n_jobs)
+                model = get_model(model_name, random_state=fold, n_jobs=n_jobs, n_gpus=n_gpus)
                 model_params = {k: str(v) for k, v in model.get_params().items()}
 
                 stats = {
