@@ -348,10 +348,12 @@ def load_s3_parquet_cached(
     )
     return pl.read_parquet(local_paths)
 
-def load_ucr_fold(data_dir: Path, dataset_name: str, fold: int):
+_DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+
+
+def load_ucr_fold(dataset_name: str, fold: int, data_dir: Path | None = None):
     from aeon.datasets import load_from_ts_file
-    #if dataset_name.startswith("m-"):
-    #    return load_tscglue_fold(dataset_name, fold)
+    data_dir = Path(data_dir) if data_dir is not None else _DEFAULT_DATA_DIR
     train = data_dir / dataset_name / f"{dataset_name}{fold}_TRAIN.ts"
     test  = data_dir / dataset_name / f"{dataset_name}{fold}_TEST.ts"
     if train.exists() and test.exists():

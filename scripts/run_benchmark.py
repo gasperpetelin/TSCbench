@@ -24,9 +24,8 @@ import numpy as np
 import polars as pl
 from aeon.classification.convolution_based import MiniRocketClassifier, RocketClassifier
 from aeon.classification.feature_based import Catch22Classifier
-from tscglue.data_loader import DATA_DIR as TSCGLUE_DATA_DIR
 from tscglue.models import TSCGlueClassifier
-from tscbench.utils import LocalFileCache, LogsFileCache, S3FileCache, discover_datasets, hardware_info, load_ucr_fold, software_versions
+from tscbench.utils import LocalFileCache, LogsFileCache, S3FileCache, _DEFAULT_DATA_DIR, discover_datasets, hardware_info, load_ucr_fold, software_versions
 
 
 def run_metadata(n_jobs: int) -> dict:
@@ -62,16 +61,14 @@ def make_cache(storage: str, output_dir: Path, s3_uri: str):
 @click.option("-m", "--models", multiple=True, required=True, help="Models to run. May be repeated or comma-separated.")
 @click.option("-d", "--datasets", "dataset_names", multiple=True, help="Datasets to run. May be repeated or comma-separated.")
 @click.option("-f", "--folds", "fold_spec", default="0", show_default=True, help="Folds to run, comma-separated, or 'all'.")
-@click.option("--data-dir", default="data", show_default=True, type=click.Path(path_type=Path))
 @click.option("-o", "--output-dir", default="artifacts/results", show_default=True, type=click.Path(path_type=Path))
 @click.option("--storage", type=click.Choice(["disk", "s3", "logs"]), default="logs", show_default=True)
 @click.option("--s3-uri", default="s3://tsc-bench/performance-benchmarking", show_default=True)
 @click.option("-j", "--n-jobs", default=8, show_default=True, type=int)
 @click.option("--overwrite", is_flag=True)
 @click.option("--list-datasets", is_flag=True)
-def main(models, dataset_names, fold_spec, data_dir, output_dir, storage, s3_uri, n_jobs, overwrite, list_datasets):
-    local_data_dir = data_dir if data_dir.exists() else Path(TSCGLUE_DATA_DIR)
-    local_datasets = discover_datasets(local_data_dir)
+def main(models, dataset_names, fold_spec, output_dir, storage, s3_uri, n_jobs, overwrite, list_datasets):
+    local_datasets = discover_datasets(_DEFAULT_DATA_DIR)
 
     if list_datasets:
         for name in local_datasets:
@@ -120,7 +117,7 @@ def main(models, dataset_names, fold_spec, data_dir, output_dir, storage, s3_uri
 
                 click.echo(f"Running:  dataset={dataset_name} fold={fold} model={model_name}")
 
-                X_train, y_train, X_test, y_test = load_ucr_fold(local_data_dir, dataset_name, fold)
+                X_train, y_train, X_test, y_test = load_ucr_fold(dataset_name, fold)
                 stats["dataset_stats"] = {
                     "n_train":     len(y_train),
                     "n_test":      len(y_test),

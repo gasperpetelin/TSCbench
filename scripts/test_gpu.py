@@ -33,7 +33,7 @@ def main(dataset, fold, data_dir):
     local_data_dir = data_dir if Path(data_dir).exists() else Path(TSCGLUE_DATA_DIR)
     click.echo(f"\nDataset:  {dataset}  fold={fold}  data_dir={local_data_dir}")
 
-    X_train, y_train, X_test, y_test = load_ucr_fold(local_data_dir, dataset, fold)
+    X_train, y_train, X_test, y_test = load_ucr_fold(dataset, fold)
     click.echo(f"Train:    {X_train.shape}  Test: {X_test.shape}")
 
     model = TSCGlue(random_state=fold)
