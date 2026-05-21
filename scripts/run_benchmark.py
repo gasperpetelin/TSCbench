@@ -1,4 +1,4 @@
-"""Run a small TSC benchmark with Rocket, TSCGlue, and Catch22.
+"""Run a TSC benchmark with Rocket, MiniRocket, Catch22, and TSCGlue.
 
 Examples:
     uv run python scripts/run_benchmark.py --datasets Crop --models tscglue --folds 0
@@ -8,9 +8,8 @@ Examples:
 # ruff: noqa: E402
 
 import os
-import re
 import sys
-from importlib.metadata import PackageNotFoundError, version
+from itertools import product
 from pathlib import Path
 from time import perf_counter
 
@@ -23,276 +22,133 @@ if str(PROJECT_ROOT) not in sys.path:
 import click
 import numpy as np
 import polars as pl
-from aeon.classification.convolution_based import RocketClassifier
+from aeon.classification.convolution_based import MiniRocketClassifier, RocketClassifier
 from aeon.classification.feature_based import Catch22Classifier
-from aeon.datasets import load_from_ts_file
-from sklearn.metrics import accuracy_score
 from tscglue.data_loader import DATA_DIR as TSCGLUE_DATA_DIR
-from tscglue.data_loader import load_fold as load_tscglue_fold
 from tscglue.models import TSCGlue
-from tscbench.utils import LocalFileCache, S3FileCache
-
-
-def package_version(package_name: str) -> str | None:
-    try:
-        return version(package_name)
-    except PackageNotFoundError:
-        return None
+from tscbench.utils import LocalFileCache, LogsFileCache, S3FileCache, discover_datasets, hardware_info, load_ucr_fold, software_versions
 
 
 def run_metadata(n_jobs: int) -> dict:
     return {
-        "python_version": sys.version.split()[0],
         "n_jobs": n_jobs,
-        "tscbench_version": package_version("tscbench"),
-        "tscglue_version": package_version("tscglue"),
-        "aeon_version": package_version("aeon"),
-        "sklearn_version": package_version("scikit-learn"),
-        "numpy_version": package_version("numpy"),
-        "polars_version": package_version("polars"),
+        "hardware": hardware_info(),
+        "versions": software_versions(),
     }
 
 
 def get_model(model_name: str, random_state: int, n_jobs: int):
     if model_name == "rocket":
         return RocketClassifier(random_state=random_state, n_jobs=n_jobs)
+    if model_name == "minirocket":
+        return MiniRocketClassifier(random_state=random_state, n_jobs=n_jobs)
+    if model_name == "catch22":
+        return Catch22Classifier(random_state=random_state, n_jobs=n_jobs)
     if model_name == "tscglue":
         return TSCGlue(random_state=random_state, n_jobs=n_jobs)
-    if model_name == "catch22":
-        return Catch22Classifier(random_state=random_state)
     raise ValueError(f"Unknown model name: {model_name}")
 
-
-def expand_csv(values: tuple[str, ...]) -> list[str]:
-    items = []
-    for value in values:
-        items.extend(item.strip() for item in value.split(",") if item.strip())
-    return items
-
-
-def discover_datasets(data_dir: Path) -> list[str]:
-    if not data_dir.exists():
-        return []
-    return sorted(path.name for path in data_dir.iterdir() if path.is_dir())
-
-
-def discover_folds(data_dir: Path, dataset_name: str) -> list[int]:
-    dataset_dir = data_dir / dataset_name
-    if not dataset_dir.exists():
-        return []
-
-    pattern = re.compile(rf"^{re.escape(dataset_name)}(\d+)_TRAIN\.ts$")
-    folds = []
-    for path in dataset_dir.iterdir():
-        match = pattern.match(path.name)
-        if match:
-            folds.append(int(match.group(1)))
-    return sorted(folds)
-
-
-def load_local_fold(data_dir: Path, dataset_name: str, fold: int):
-    dataset_dir = data_dir / dataset_name
-    train_path = dataset_dir / f"{dataset_name}{fold}_TRAIN.ts"
-    test_path = dataset_dir / f"{dataset_name}{fold}_TEST.ts"
-
-    if not train_path.exists() or not test_path.exists():
-        raise FileNotFoundError(
-            f"Missing local fold files: {train_path.name} and/or {test_path.name}"
-        )
-
-    X_train, y_train = load_from_ts_file(train_path)
-    X_test, y_test = load_from_ts_file(test_path)
-    return X_train, y_train, X_test, y_test
-
-
-def load_benchmark_fold(data_dir: Path, dataset_name: str, fold: int):
-    if dataset_name.startswith("m-"):
-        return load_tscglue_fold(dataset_name, fold)
-
-    local_train = data_dir / dataset_name / f"{dataset_name}{fold}_TRAIN.ts"
-    local_test = data_dir / dataset_name / f"{dataset_name}{fold}_TEST.ts"
-    if local_train.exists() and local_test.exists():
-        return load_local_fold(data_dir, dataset_name, fold)
-
-    return load_tscglue_fold(dataset_name, fold)
-
-
-def result_filename(dataset: str, model_name: str, fold: int) -> str:
-    stem = f"{dataset}__{model_name}__fold_{fold}"
-    safe_stem = re.sub(r"[^A-Za-z0-9_.+-]+", "_", stem)
-    return f"{safe_stem}.parquet"
 
 
 def make_cache(storage: str, output_dir: Path, s3_uri: str):
     if storage == "s3":
         return S3FileCache(s3_uri)
+    if storage == "logs":
+        return LogsFileCache()
     return LocalFileCache(output_dir)
 
 
 @click.command()
-@click.option(
-    "-m",
-    "--models",
-    multiple=True,
-    required=True,
-    help="Models to run. May be repeated or comma-separated.",
-)
-@click.option(
-    "-d",
-    "--datasets",
-    "dataset_names",
-    multiple=True,
-    help="Datasets to run. May be repeated or comma-separated.",
-)
-@click.option(
-    "-f",
-    "--folds",
-    "fold_spec",
-    default="0",
-    show_default=True,
-    help="Folds to run, comma-separated, or 'all'.",
-)
-@click.option(
-    "--data-dir",
-    default="data",
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help="Local fold data root. Falls back to tscglue's bundled data loader.",
-)
-@click.option(
-    "-o",
-    "--output-dir",
-    default="artifacts/results",
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help="Directory for per-run parquet result files.",
-)
-@click.option(
-    "--storage",
-    type=click.Choice(["disk", "s3"]),
-    default="disk",
-    show_default=True,
-    help="Result cache backend.",
-)
-@click.option(
-    "--s3-uri",
-    default="s3://tsc-bench/performance-benchmarking",
-    show_default=True,
-    help="S3 result cache URI when --storage=s3.",
-)
+@click.option("-m", "--models", multiple=True, required=True, help="Models to run. May be repeated or comma-separated.")
+@click.option("-d", "--datasets", "dataset_names", multiple=True, help="Datasets to run. May be repeated or comma-separated.")
+@click.option("-f", "--folds", "fold_spec", default="0", show_default=True, help="Folds to run, comma-separated, or 'all'.")
+@click.option("--data-dir", default="data", show_default=True, type=click.Path(path_type=Path))
+@click.option("-o", "--output-dir", default="artifacts/results", show_default=True, type=click.Path(path_type=Path))
+@click.option("--storage", type=click.Choice(["disk", "s3", "logs"]), default="logs", show_default=True)
+@click.option("--s3-uri", default="s3://tsc-bench/performance-benchmarking", show_default=True)
 @click.option("-j", "--n-jobs", default=8, show_default=True, type=int)
-@click.option("--overwrite", is_flag=True, help="Re-run even if a result parquet already exists.")
-@click.option("--list-datasets", is_flag=True, help="List local datasets and exit.")
-def main(
-    models: tuple[str, ...],
-    dataset_names: tuple[str, ...],
-    fold_spec: str,
-    data_dir: Path,
-    output_dir: Path,
-    storage: str,
-    s3_uri: str,
-    n_jobs: int,
-    overwrite: bool,
-    list_datasets: bool,
-):
+@click.option("--overwrite", is_flag=True)
+@click.option("--list-datasets", is_flag=True)
+def main(models, dataset_names, fold_spec, data_dir, output_dir, storage, s3_uri, n_jobs, overwrite, list_datasets):
     local_data_dir = data_dir if data_dir.exists() else Path(TSCGLUE_DATA_DIR)
     local_datasets = discover_datasets(local_data_dir)
 
     if list_datasets:
-        if not local_datasets:
-            click.echo(f"No local datasets found in {local_data_dir}")
-            return
-        for dataset_name in local_datasets:
-            folds = discover_folds(local_data_dir, dataset_name)
-            click.echo(f"{dataset_name} ({len(folds)} folds)")
+        for name in local_datasets:
+            click.echo(f"{name} (30 folds)")
         return
 
-    model_names = expand_csv(models)
-    if not model_names:
-        raise click.UsageError("Pass at least one model with --models.")
+    model_names = [m.strip() for ms in models for m in ms.split(",") if m.strip()]
+    datasets = [d.strip() for ds in dataset_names for d in ds.split(",") if d.strip()] or local_datasets
 
-    datasets = expand_csv(dataset_names)
     if not datasets:
-        if not local_datasets:
-            raise click.UsageError(
-                "No datasets were provided and no local data directory was found. "
-                "Pass --datasets, for example: --datasets Crop"
-            )
-        datasets = local_datasets
+        raise click.UsageError("No datasets found. Pass --datasets or add data to --data-dir.")
 
-    click.echo(f"Models: {', '.join(model_names)}")
-    click.echo(f"Datasets: {', '.join(datasets)}")
     cache = make_cache(storage, output_dir, s3_uri)
     metadata = run_metadata(n_jobs=n_jobs)
-    click.echo(f"Results: {s3_uri if storage == 's3' else output_dir}")
+
+    click.echo(f"Models:   {', '.join(model_names)}")
+    click.echo(f"Datasets: {', '.join(datasets)}")
+    click.echo(f"Results:  {s3_uri if storage == 's3' else output_dir}")
 
     for dataset_name in datasets:
         if fold_spec == "all":
-            folds = discover_folds(local_data_dir, dataset_name)
-            if not folds:
-                folds = list(range(30))
+            folds = list(range(30))
         else:
-            folds = [int(part.strip()) for part in fold_spec.split(",") if part.strip()]
+            folds = [int(f.strip()) for f in fold_spec.split(",") if f.strip()]
 
-        for fold in folds:
-            for model_name in model_names:
-                filename = result_filename(dataset_name, model_name, fold)
-                if cache.exists(filename) and not overwrite:
-                    click.echo(f"Skipping existing: {filename}")
-                    continue
+        for model_name, fold in product(model_names, folds):
+            model = None
+            try:
+                model = get_model(model_name, random_state=fold, n_jobs=n_jobs)
+                model_params = {k: str(v) for k, v in model.get_params().items()}
 
                 stats = {
                     "dataset": dataset_name,
                     "fold": fold,
                     "model": model_name,
                     "random_state": fold,
-                    "status": "ok",
                     **metadata,
+                    "model_params": model_params,
                 }
 
-                click.echo(f"Running dataset={dataset_name} fold={fold} model={model_name}")
-                model = None
-                try:
-                    model = get_model(model_name, random_state=fold, n_jobs=n_jobs)
-                except ValueError as exc:
-                    raise click.UsageError(str(exc)) from exc
+                filename = f"{pl.DataFrame([{k: stats[k] for k in ('dataset', 'fold', 'model', 'random_state', 'n_jobs', 'hardware', 'versions', 'model_params')}]).hash_rows(seed=42, seed_1=1, seed_2=2, seed_3=3).item()}.parquet"
 
-                try:
-                    X_train, y_train, X_test, y_test = load_benchmark_fold(
-                        local_data_dir, dataset_name, fold
-                    )
-                    stats.update(
-                        {
-                            "n_train": len(y_train),
-                            "n_test": len(y_test),
-                            "n_classes": int(len(np.unique(y_train))),
-                        }
-                    )
+                if cache.exists(filename) and not overwrite:
+                    click.echo(f"Skipping: dataset={dataset_name} fold={fold} model={model_name}")
+                    continue
 
-                    t0 = perf_counter()
-                    model.fit(X_train, y_train)
-                    fit_seconds = perf_counter() - t0
-                    stats["fit_seconds"] = fit_seconds
-                    stats["fit_seconds_per_sample"] = fit_seconds / len(y_train)
+                click.echo(f"Running:  dataset={dataset_name} fold={fold} model={model_name}")
 
-                    t0 = perf_counter()
-                    preds = model.predict(X_test)
-                    predict_seconds = perf_counter() - t0
-                    stats["predict_seconds"] = predict_seconds
-                    stats["inference_seconds"] = predict_seconds
-                    stats["predict_seconds_per_sample"] = predict_seconds / len(y_test)
-                    stats["inference_seconds_per_sample"] = predict_seconds / len(y_test)
-                    stats["total_seconds"] = fit_seconds + predict_seconds
-                    stats["test_accuracy"] = float(accuracy_score(y_test, preds))
-                except Exception as exc:
-                    stats["status"] = "error"
-                    stats["error"] = repr(exc)
-                    click.echo(f"Error: {exc}", err=True)
-                finally:
-                    if model is not None and hasattr(model, "cleanup"):
-                        model.cleanup()
+                X_train, y_train, X_test, y_test = load_ucr_fold(local_data_dir, dataset_name, fold)
+                stats["dataset_stats"] = {
+                    "n_train":     len(y_train),
+                    "n_test":      len(y_test),
+                    "n_classes":   int(len(np.unique(y_train))),
+                    "n_channels":  int(X_train.shape[1]),
+                    "n_timepoints": int(X_train.shape[2]),
+                }
+
+                t0 = perf_counter()
+                model.fit(X_train, y_train)
+                fit_s = perf_counter() - t0
+
+                t0 = perf_counter()
+                preds = model.predict(X_test)
+                predict_s = perf_counter() - t0
+
+                stats["timing"] = {"fit_s": fit_s, "predict_s": predict_s}
+                stats["y_true"] = y_test.tolist()
+                stats["y_pred"] = preds.tolist()
+                if hasattr(model, "predict_proba"):
+                    stats["y_prob"] = model.predict_proba(X_test).tolist()
 
                 cache.add(pl.DataFrame([stats]), filename)
+            except Exception as exc:
+                click.echo(f"Error: dataset={dataset_name} fold={fold} model={model_name}: {exc}", err=True)
+            finally:
+                if model is not None and hasattr(model, "cleanup"):
+                    model.cleanup()
 
 
 if __name__ == "__main__":
