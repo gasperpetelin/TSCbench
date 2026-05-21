@@ -25,7 +25,7 @@ import polars as pl
 from aeon.classification.convolution_based import MiniRocketClassifier, RocketClassifier
 from aeon.classification.feature_based import Catch22Classifier
 from tscglue.data_loader import DATA_DIR as TSCGLUE_DATA_DIR
-from tscglue.models import TSCGlue
+from tscglue.models import TSCGlueClassifier
 from tscbench.utils import LocalFileCache, LogsFileCache, S3FileCache, discover_datasets, hardware_info, load_ucr_fold, software_versions
 
 
@@ -45,7 +45,7 @@ def get_model(model_name: str, random_state: int, n_jobs: int):
     if model_name == "catch22":
         return Catch22Classifier(random_state=random_state, n_jobs=n_jobs)
     if model_name == "tscglue":
-        return TSCGlue(random_state=random_state, n_jobs=n_jobs)
+        return TSCGlueClassifier(random_state=random_state, n_jobs=n_jobs)
     raise ValueError(f"Unknown model name: {model_name}")
 
 
