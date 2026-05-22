@@ -3,7 +3,6 @@
 #SBATCH --time=08:00:00
 #SBATCH --time-min=00:30:00
 #SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:1
 #SBATCH --mem=32G
 #SBATCH --output=logs/benchmark_%A_%a.out
 #SBATCH --error=logs/benchmark_%A_%a.err
@@ -27,7 +26,7 @@ export PYTHONFAULTHANDLER=1
 mkdir -p logs
 
 if [ -n "${SLURM_JOB_GPUS:-}" ]; then
-    N_GPUS=$(echo "$SLURM_JOB_GPUS" | tr ',' '\n' | wc -l)
+    N_GPUS=$(echo "$SLURM_JOB_GPUS" | tr ',' '\n' | grep -c .)
 else
     N_GPUS=0
 fi
