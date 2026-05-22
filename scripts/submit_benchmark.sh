@@ -1,9 +1,9 @@
 #!/bin/bash
 # Submit benchmark jobs for all model groups.
-# Datasets: 5 small UCR datasets.
+# Datasets: 15 UCR datasets of varying sizes.
 # Usage: bash scripts/submit_benchmark.sh
 
-DATASETS="ArrowHead,Beef,Car,Coffee,Fish"
+DATASETS="ArrowHead,Beef,Car,Coffee,Fish,GunPoint,ECG200,ItalyPowerDemand,SwedishLeaf,FaceAll,Wafer,FordA,ElectricDevices,Crop,NonInvasiveFatalECGThorax1"
 CPUS=8
 FOLDS="1-5"
 
