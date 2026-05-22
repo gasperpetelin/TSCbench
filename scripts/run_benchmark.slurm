@@ -25,4 +25,4 @@ export HF_HUB_OFFLINE=1
 export PYTHONFAULTHANDLER=1
 
 mkdir -p logs
-uv run --no-sync python scripts/run_benchmark.py --storage disk -j 8 -g 1 -f $SLURM_ARRAY_TASK_ID "$@"
+uv run --no-sync python scripts/run_benchmark.py --storage disk -j $SLURM_CPUS_PER_TASK -g 1 -f $SLURM_ARRAY_TASK_ID "$@"
