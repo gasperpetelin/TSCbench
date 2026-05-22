@@ -25,4 +25,11 @@ export HF_HUB_OFFLINE=1
 export PYTHONFAULTHANDLER=1
 
 mkdir -p logs
-uv run --no-sync python scripts/run_benchmark.py --storage disk -j $SLURM_CPUS_PER_TASK -g 1 -f $SLURM_ARRAY_TASK_ID "$@"
+
+if [ -n "${SLURM_JOB_GPUS:-}" ]; then
+    N_GPUS=$(echo "$SLURM_JOB_GPUS" | tr ',' '\n' | wc -l)
+else
+    N_GPUS=0
+fi
+
+uv run --no-sync python scripts/run_benchmark.py --storage disk -j $SLURM_CPUS_PER_TASK -g $N_GPUS -f $SLURM_ARRAY_TASK_ID "$@"

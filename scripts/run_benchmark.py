@@ -62,7 +62,7 @@ def make_cache(storage: str, output_dir: Path, s3_uri: str):
 @click.option("-m", "--models", multiple=True, required=True, help="Models to run. May be repeated or comma-separated.")
 @click.option("-d", "--datasets", "dataset_names", multiple=True, help="Datasets to run. May be repeated or comma-separated.")
 @click.option("-f", "--folds", "fold_spec", default="0", show_default=True, help="Folds to run, comma-separated, or 'all'.")
-@click.option("-o", "--output-dir", default="artifacts/results", show_default=True, type=click.Path(path_type=Path))
+@click.option("-o", "--output-dir", default="results", show_default=True, type=click.Path(path_type=Path))
 @click.option("--storage", type=click.Choice(["disk", "s3", "logs"]), default="logs", show_default=True)
 @click.option("--s3-uri", default="s3://tsc-bench/performance-benchmarking", show_default=True)
 @click.option("-j", "--n-jobs", default=8, show_default=True, type=int)

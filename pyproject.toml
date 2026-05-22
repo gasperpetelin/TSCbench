@@ -6,10 +6,7 @@ build-backend = "hatchling.build"
 name = "tscbench"
 version = "0.1.0"
 requires-python = ">=3.12,<3.14"
-dependencies = []
-
-[project.optional-dependencies]
-dev = [
+dependencies = [
     "ruff",
     "isort",
     "pytest",
@@ -17,13 +14,12 @@ dev = [
     "boto3",
     "awscli",
     "moto[s3]",
-]
-notebooks = [
     "jupyter",
     "jupyterlab",
     "ipykernel",
     "hvplot",
     "polars",
+    "psutil",
 ]
 
 [tool.hatch.build.targets.wheel]

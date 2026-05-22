@@ -35,12 +35,12 @@ clean: ## Removes env, docs and caches
 	uv cache clean
 
 tests: ## Run the unit tests
-	uv run --extra dev pytest tests/ -vv -W ignore::DeprecationWarning --capture=no --durations=0 --cache-clear --maxfail=1
+	uv run pytest tests/ -vv -W ignore::DeprecationWarning --capture=no --durations=0 --cache-clear --maxfail=1
 
 format: ## Format the code with isort and ruff
-	uv run --extra dev isort . --profile black
-	uv run --extra dev ruff format .
-	uv run --extra dev ruff check . --fix
+	uv run isort . --profile black
+	uv run ruff format .
+	uv run ruff check . --fix
 
 download-models: ## Pre-download HF models (Mantis, Chronos-2) for offline/SLURM use
 	uv run --no-sync python -c "from tscglue.models_tsfm import download_models; download_models()"
