@@ -17,12 +17,14 @@ setup-cpu:  ## Install tscglue with CPU PyTorch
 	uv sync
 	uv pip install torch --index-url https://download.pytorch.org/whl/cpu
 	uv pip install "tscglue[cpu] @ git+https://github.com/gasperpetelin/TSCGlue@main"
+	uv pip install pytorch-lightning chronos-forecasting "mantis-tsfm>=1.0.0" transformers accelerate
 
 setup-cuda:  ## Install tscglue with CUDA 12.4 PyTorch
 	rm -f uv.lock
 	uv sync
 	uv pip install torch --index-url https://download.pytorch.org/whl/cu124
 	uv pip install "tscglue[cu124] @ git+https://github.com/gasperpetelin/TSCGlue@main"
+	uv pip install pytorch-lightning chronos-forecasting "mantis-tsfm>=1.0.0" transformers accelerate
 
 list:
 	@LC_ALL=C $(MAKE) -pRrq -f $(firstword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/(^|\n)# Files(\n|$$)/,/(^|\n)# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | grep -E -v -e '^[^[:alnum:]]' -e '^$$@$$'
