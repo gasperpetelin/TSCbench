@@ -9,6 +9,8 @@ Examples:
 
 import os
 import sys
+import tempfile
+import uuid
 from itertools import product
 from pathlib import Path
 from time import perf_counter
@@ -37,7 +39,7 @@ def run_metadata(n_jobs: int, n_gpus: int) -> dict:
     }
 
 
-def get_model(model_name: str, random_state: int, n_jobs: int, n_gpus: int):
+def get_model(model_name: str, random_state: int, n_jobs: int, n_gpus: int, runs_dir: str | None = None):
     if model_name == "rocket":
         return RocketClassifier(random_state=random_state, n_jobs=n_jobs)
     if model_name == "minirocket":
@@ -45,7 +47,7 @@ def get_model(model_name: str, random_state: int, n_jobs: int, n_gpus: int):
     if model_name == "catch22":
         return Catch22Classifier(random_state=random_state, n_jobs=n_jobs)
     if model_name == "tscglue":
-        return TSCGlueClassifier(random_state=random_state, n_jobs=n_jobs, n_gpus=n_gpus)
+        return TSCGlueClassifier(random_state=random_state, n_jobs=n_jobs, n_gpus=n_gpus, runs_dir=runs_dir)
     raise ValueError(f"Unknown model name: {model_name}")
 
 
@@ -97,57 +99,56 @@ def main(models, dataset_names, fold_spec, output_dir, storage, s3_uri, n_jobs, 
             folds = [int(f.strip()) for f in fold_spec.split(",") if f.strip()]
 
         for model_name, fold in product(model_names, folds):
-            model = None
-            try:
-                model = get_model(model_name, random_state=fold, n_jobs=n_jobs, n_gpus=n_gpus)
-                model_params = {k: str(v) for k, v in model.get_params().items()}
+            run_id = f"{dataset_name}_{model_name}_{fold}_{uuid.uuid4().hex[:8]}"
+            with tempfile.TemporaryDirectory(prefix=f"tscglue_run_{run_id}_") as tmp_dir:
+                model = None
+                try:
+                    model = get_model(model_name, random_state=fold, n_jobs=n_jobs, n_gpus=n_gpus, runs_dir=tmp_dir)
+                    model_params = {k: str(v) for k, v in model.get_params().items()}
 
-                stats = {
-                    "dataset": dataset_name,
-                    "fold": fold,
-                    "model": model_name,
-                    "random_state": fold,
-                    **metadata,
-                    "model_params": model_params,
-                }
+                    stats = {
+                        "dataset": dataset_name,
+                        "fold": fold,
+                        "model": model_name,
+                        "random_state": fold,
+                        **metadata,
+                        "model_params": model_params,
+                    }
 
-                filename = f"{pl.DataFrame([{k: stats[k] for k in ('dataset', 'fold', 'model', 'random_state', 'n_jobs', 'hardware', 'versions', 'model_params')}]).hash_rows(seed=42, seed_1=1, seed_2=2, seed_3=3).item()}.parquet"
+                    filename = f"{pl.DataFrame([{k: stats[k] for k in ('dataset', 'fold', 'model', 'random_state', 'n_jobs', 'hardware', 'versions', 'model_params')}]).hash_rows(seed=42, seed_1=1, seed_2=2, seed_3=3).item()}.parquet"
 
-                if cache.exists(filename) and not overwrite:
-                    click.echo(f"Skipping: dataset={dataset_name} fold={fold} model={model_name}")
-                    continue
+                    if cache.exists(filename) and not overwrite:
+                        click.echo(f"Skipping: dataset={dataset_name} fold={fold} model={model_name}")
+                        continue
 
-                click.echo(f"Running:  dataset={dataset_name} fold={fold} model={model_name}")
+                    click.echo(f"Running:  dataset={dataset_name} fold={fold} model={model_name}")
 
-                X_train, y_train, X_test, y_test = load_ucr_fold(dataset_name, fold)
-                stats["dataset_stats"] = {
-                    "n_train":     len(y_train),
-                    "n_test":      len(y_test),
-                    "n_classes":   int(len(np.unique(y_train))),
-                    "n_channels":  int(X_train.shape[1]),
-                    "n_timepoints": int(X_train.shape[2]),
-                }
+                    X_train, y_train, X_test, y_test = load_ucr_fold(dataset_name, fold)
+                    stats["dataset_stats"] = {
+                        "n_train":     len(y_train),
+                        "n_test":      len(y_test),
+                        "n_classes":   int(len(np.unique(y_train))),
+                        "n_channels":  int(X_train.shape[1]),
+                        "n_timepoints": int(X_train.shape[2]),
+                    }
 
-                t0 = perf_counter()
-                model.fit(X_train, y_train)
-                fit_s = perf_counter() - t0
+                    t0 = perf_counter()
+                    model.fit(X_train, y_train)
+                    fit_s = perf_counter() - t0
 
-                t0 = perf_counter()
-                preds = model.predict(X_test)
-                predict_s = perf_counter() - t0
+                    t0 = perf_counter()
+                    preds = model.predict(X_test)
+                    predict_s = perf_counter() - t0
 
-                stats["timing"] = {"fit_s": fit_s, "predict_s": predict_s}
-                stats["y_true"] = y_test.tolist()
-                stats["y_pred"] = preds.tolist()
-                if hasattr(model, "predict_proba"):
-                    stats["y_prob"] = model.predict_proba(X_test).tolist()
+                    stats["timing"] = {"fit_s": fit_s, "predict_s": predict_s}
+                    stats["y_true"] = y_test.tolist()
+                    stats["y_pred"] = preds.tolist()
+                    if hasattr(model, "predict_proba"):
+                        stats["y_prob"] = model.predict_proba(X_test).tolist()
 
-                cache.add(pl.DataFrame([stats]), filename)
-            except Exception as exc:
-                click.echo(f"Error: dataset={dataset_name} fold={fold} model={model_name}: {exc}", err=True)
-            finally:
-                if model is not None and hasattr(model, "cleanup"):
-                    model.cleanup()
+                    cache.add(pl.DataFrame([stats]), filename)
+                except Exception as exc:
+                    click.echo(f"Error: dataset={dataset_name} fold={fold} model={model_name}: {exc}", err=True)
 
 
 if __name__ == "__main__":
