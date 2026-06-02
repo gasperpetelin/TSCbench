@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from aeon.datasets import load_classification
 import os
 import tempfile
 import threading
@@ -12,6 +11,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import polars as pl
+from aeon.datasets import load_classification
+
 
 class MemoryTracker:
     """Track peak RSS memory (process + children) in a background thread."""
@@ -24,7 +25,9 @@ class MemoryTracker:
 
     def _poll(self):
         import time
+
         import psutil
+
         proc = psutil.Process(os.getpid())
         self._times = []
         self._values = []
@@ -54,6 +57,7 @@ class MemoryTracker:
 
     def plot(self, path="memory.png"):
         import matplotlib.pyplot as plt
+
         fig, ax = plt.subplots(figsize=(12, 4))
         ax.plot(self._times, [v / 1024**3 for v in self._values])
         ax.set_xlabel("Time (s)")
@@ -160,6 +164,7 @@ class S3FileCache(AbstractFileCache):
             if cache_dir is not None
             else Path(tempfile.gettempdir()) / "tscbench-cache" / subdir
         )
+        print(f"Using local cache directory: {local_dir}")
         local_dir.mkdir(parents=True, exist_ok=True)
 
         local_files = {path.name for path in local_dir.iterdir() if path.suffix == ".parquet"}
@@ -182,7 +187,7 @@ class S3FileCache(AbstractFileCache):
         paths = sorted(local_dir.glob("*.parquet"))
         if not paths:
             return pl.DataFrame()
-        return pl.read_parquet(paths)
+        return pl.concat([pl.read_parquet(p) for p in paths], how="diagonal_relaxed")
 
 
 class LogsFileCache(AbstractFileCache):
@@ -234,9 +239,11 @@ class LocalFileCache(AbstractFileCache):
     def read_parquet(self, filename: str) -> pl.DataFrame:
         return pl.read_parquet(self.base_dir / filename)
 
+
 def software_versions() -> dict:
     import sys
-    from importlib.metadata import PackageNotFoundError, version as pkg_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as pkg_version
 
     def _ver(name: str) -> str | None:
         try:
@@ -268,12 +275,14 @@ def hardware_info() -> dict:
     gpu_names = None
     try:
         import torch
+
         if torch.cuda.is_available():
             gpu_names = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
     except ImportError:
         pass
 
     import psutil
+
     return {
         "cpu": cpu_name,
         "cpu_cores_physical": psutil.cpu_count(logical=False),
@@ -294,6 +303,7 @@ def load_dataset(dataset_name):
     X_train, y_train = load_classification(dataset_name, split="train")
     X_test, y_test = load_classification(dataset_name, split="test")
     return X_train, y_train, X_test, y_test
+
 
 def load_s3_parquet_cached(
     s3_prefix: str = "s3://tsc-glue/performance-benchmarking/",
@@ -344,22 +354,27 @@ def load_s3_parquet_cached(
     local_paths = sorted(
         os.path.join(cache_dir, f)
         for f in os.listdir(cache_dir)
-        if f.endswith(".parquet") and (not skip_empty or os.path.getsize(os.path.join(cache_dir, f)) > 0)
+        if f.endswith(".parquet")
+        and (not skip_empty or os.path.getsize(os.path.join(cache_dir, f)) > 0)
     )
     return pl.read_parquet(local_paths)
+
 
 _DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 
 def load_ucr_fold(dataset_name: str, fold: int, data_dir: Path | None = None):
     from aeon.datasets import load_from_ts_file
+
     data_dir = Path(data_dir) if data_dir is not None else _DEFAULT_DATA_DIR
     train = data_dir / dataset_name / f"{dataset_name}{fold}_TRAIN.ts"
-    test  = data_dir / dataset_name / f"{dataset_name}{fold}_TEST.ts"
+    test = data_dir / dataset_name / f"{dataset_name}{fold}_TEST.ts"
     if train.exists() and test.exists():
         X_train, y_train = load_from_ts_file(train)
-        X_test,  y_test  = load_from_ts_file(test)
+        X_test, y_test = load_from_ts_file(test)
         return X_train, y_train, X_test, y_test
     else:
-        raise FileNotFoundError(f"Fold files not found for dataset={dataset_name} fold={fold} in {data_dir}")
-    #return load_tscglue_fold(dataset_name, fold)
+        raise FileNotFoundError(
+            f"Fold files not found for dataset={dataset_name} fold={fold} in {data_dir}"
+        )
+    # return load_tscglue_fold(dataset_name, fold)

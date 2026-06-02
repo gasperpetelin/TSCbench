@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=benchmark
 #SBATCH --time=08:00:00
-#SBATCH --time-min=00:30:00
+#SBATCH --time-min=01:30:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --output=logs/benchmark_%A_%a.out

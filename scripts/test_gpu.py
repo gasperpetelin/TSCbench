@@ -16,6 +16,7 @@ import click
 import torch
 from tscglue.data_loader import DATA_DIR as TSCGLUE_DATA_DIR
 from tscglue.models import TSCGlue
+
 from tscbench.utils import load_ucr_fold
 
 
