@@ -29,7 +29,9 @@ AVAILABLE_CLASSIFIERS = [
     "MiniRocket",
     "Catch22",
     "TSCGlue-Accuracy",
+    "TSCGlue-Accuracy-GPU",
     "TSCGlue-LogLoss",
+    "TSCGlue-LogLoss-GPU",
 ]
 
 
@@ -40,9 +42,25 @@ def make_classifier(name: str, random_state: int, n_jobs: int):
         return TSCGlueClassifier(
             verbose=10, random_state=random_state, n_jobs=n_jobs, eval_metric="accuracy"
         )
+    if name == "TSCGlue-Accuracy-GPU":
+        import torch
+        detected = torch.cuda.device_count()
+        if detected == 0:
+            raise RuntimeError("TSCGlue-Accuracy-GPU requires at least one CUDA GPU, but none were detected.")
+        return TSCGlueClassifier(
+            verbose=10, random_state=random_state, n_jobs=n_jobs, n_gpus=detected, eval_metric="accuracy"
+        )
     if name == "TSCGlue-LogLoss":
         return TSCGlueClassifier(
             verbose=10, random_state=random_state, n_jobs=n_jobs, eval_metric="log_loss"
+        )
+    if name == "TSCGlue-LogLoss-GPU":
+        import torch
+        detected = torch.cuda.device_count()
+        if detected == 0:
+            raise RuntimeError("TSCGlue-LogLoss-GPU requires at least one CUDA GPU, but none were detected.")
+        return TSCGlueClassifier(
+            verbose=10, random_state=random_state, n_jobs=n_jobs, n_gpus=detected, eval_metric="log_loss"
         )
     return _set_bakeoff_classifier(name, random_state=random_state, n_jobs=n_jobs)
 
