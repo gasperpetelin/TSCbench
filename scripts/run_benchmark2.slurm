@@ -6,8 +6,6 @@
 #SBATCH --mem=32G
 #SBATCH --output=logs/benchmark2_%A_%a.out
 #SBATCH --error=logs/benchmark2_%A_%a.err
-##SBATCH --partition=e7
-##SBATCH --reservation=e7
 #SBATCH --array=0-3
 
 # SLURM array task ID is used as the fold index.
