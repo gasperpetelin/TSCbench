@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=benchmark2
+#SBATCH --job-name=benchmark
 #SBATCH --time=08:00:00
 #SBATCH --time-min=01:30:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --output=logs/benchmark2_%A_%a.out
 #SBATCH --error=logs/benchmark2_%A_%a.err
-#SBATCH --partition=e7
-#SBATCH --reservation=e7
-#SBATCH --array=0-29
+##SBATCH --partition=e7
+##SBATCH --reservation=e7
+#SBATCH --array=0-3
 
 # SLURM array task ID is used as the fold index.
 # All other args (--classifiers, --datasets, ...) are passed through via "$@".
