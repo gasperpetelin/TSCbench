@@ -1,8 +1,8 @@
 """Run a TSC benchmark using tsml-format result files.
 
 Examples:
-    uv run python scripts/run_benchmark2.py --classifiers ROCKET,Catch22 --resamples 0
-    uv run python scripts/run_benchmark2.py --classifiers ROCKET --datasets Crop --resamples 0,1,2
+    uv run python scripts/run_benchmark2.py --classifiers ROCKET,Catch22 --folds 0
+    uv run python scripts/run_benchmark2.py --classifiers TSCGlue-Accuracy-GPU --datasets Crop --folds 0,1,2
     uv run python scripts/run_benchmark2.py --evaluate-only
 """
 
@@ -12,6 +12,7 @@ from itertools import product
 from pathlib import Path
 
 import click
+from aeon.classification.hybrid import HIVECOTEV2
 from aeon.datasets.tsc_datasets import univariate_equal_length
 from tsml_eval.experiments import load_and_run_classification_experiment
 from tsml_eval.publications.y2023.tsc_bakeoff.set_bakeoff_classifier import (
@@ -27,40 +28,35 @@ _DEFAULT_DATA = str(PROJECT_ROOT / "data")
 AVAILABLE_CLASSIFIERS = [
     "ROCKET",
     "MiniRocket",
+    "MultiRocketHydra",
     "Catch22",
-    "TSCGlue-Accuracy",
+    "HIVECOTEV2",
     "TSCGlue-Accuracy-GPU",
-    "TSCGlue-LogLoss",
     "TSCGlue-LogLoss-GPU",
+    "TSCGlue-ROCAUC-GPU",
 ]
 
 
 def make_classifier(name: str, random_state: int, n_jobs: int):
     from tscglue.models import TSCGlueClassifier
 
-    if name == "TSCGlue-Accuracy":
-        return TSCGlueClassifier(
-            verbose=10, random_state=random_state, n_jobs=n_jobs, eval_metric="accuracy"
-        )
     if name == "TSCGlue-Accuracy-GPU":
         import torch
-        detected = torch.cuda.device_count()
-        if detected == 0:
-            raise RuntimeError("TSCGlue-Accuracy-GPU requires at least one CUDA GPU, but none were detected.")
         return TSCGlueClassifier(
-            verbose=10, random_state=random_state, n_jobs=n_jobs, n_gpus=detected, eval_metric="accuracy"
-        )
-    if name == "TSCGlue-LogLoss":
-        return TSCGlueClassifier(
-            verbose=10, random_state=random_state, n_jobs=n_jobs, eval_metric="log_loss"
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="accuracy",
         )
     if name == "TSCGlue-LogLoss-GPU":
         import torch
-        detected = torch.cuda.device_count()
-        if detected == 0:
-            raise RuntimeError("TSCGlue-LogLoss-GPU requires at least one CUDA GPU, but none were detected.")
         return TSCGlueClassifier(
-            verbose=10, random_state=random_state, n_jobs=n_jobs, n_gpus=detected, eval_metric="log_loss"
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="log_loss",
+        )
+    if name == "TSCGlue-ROCAUC-GPU":
+        import torch
+        return TSCGlueClassifier(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
         )
     return _set_bakeoff_classifier(name, random_state=random_state, n_jobs=n_jobs)
 
@@ -108,7 +104,7 @@ def make_classifier(name: str, random_state: int, n_jobs: int):
     type=click.Path(path_type=Path),
     help="Directory for summary CSVs and critical-difference diagrams.",
 )
-@click.option("-j", "--n-jobs", default=32, show_default=True, type=int)
+@click.option("-j", "--n-jobs", default=8, show_default=True, type=int)
 @click.option("--overwrite", is_flag=True, help="Re-run and overwrite existing results.")
 @click.option("--evaluate", is_flag=True, help="Run evaluation after benchmarking.")
 @click.option(

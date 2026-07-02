@@ -107,6 +107,10 @@ def get_model(
         return HIVECOTEV2(
             random_state=random_state, n_jobs=n_jobs, time_limit_in_minutes=60
         )
+    if model_name == "hivecote-2h":
+        return HIVECOTEV2(
+            random_state=random_state, n_jobs=n_jobs, time_limit_in_minutes=120
+        )
     if model_name == "hivecote-4h":
         return HIVECOTEV2(
             random_state=random_state, n_jobs=n_jobs, time_limit_in_minutes=240
