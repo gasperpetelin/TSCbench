@@ -6,8 +6,6 @@
 #SBATCH --mem=32G
 #SBATCH --output=logs/benchmark_%A_%a.out
 #SBATCH --error=logs/benchmark_%A_%a.err
-#SBATCH --partition=e7
-#SBATCH --reservation=e7
 #SBATCH --array=0-29
 
 # Folds are handled by the SLURM array (0-29), storage is always disk.
