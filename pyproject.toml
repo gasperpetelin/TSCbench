@@ -21,8 +21,12 @@ dependencies = [
     "polars",
     "psutil",
     "numpy<2.4",
-    "tsml-eval>=0.6.0"
+    "tsml-eval",
+    "aeon>=1.4.0,<1.5.0"
 ]
+
+[tool.uv.sources]
+tsml-eval = { git = "https://github.com/time-series-machine-learning/tsml-eval", branch = "main" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["tscbench"]
