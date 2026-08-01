@@ -27,6 +27,7 @@ dependencies = [
 
 [tool.uv.sources]
 tsml-eval = { git = "https://github.com/time-series-machine-learning/tsml-eval", branch = "main" }
+tsml = { git = "https://github.com/time-series-machine-learning/tsml-py", branch = "main" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["tscbench"]

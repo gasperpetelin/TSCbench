@@ -6,11 +6,17 @@ Examples:
     uv run python scripts/run_benchmark2.py --evaluate-only
 """
 
+import os
 import random
 import sys
 from itertools import product
 from pathlib import Path
 
+os.environ["PYTHONUNBUFFERED"] = "1"
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
+import aeon.base._base_collection as _base_collection
 import click
 from aeon.classification.hybrid import HIVECOTEV2
 from aeon.datasets.tsc_datasets import univariate_equal_length
@@ -18,6 +24,23 @@ from tsml_eval.experiments import load_and_run_classification_experiment
 from tsml_eval.publications.y2023.tsc_bakeoff.set_bakeoff_classifier import (
     _set_bakeoff_classifier,
 )
+
+# aeon's zero-variance guard (aeon/base/_base_collection.py) runs on every recursive
+# call an estimator makes internally, including short interval/shapelet slices that
+# are legitimately near-constant up to float rounding (aeon#3570, aeon#3599). This
+# false-positives HIVECOTEV2 out of otherwise-valid fits. No fixed threshold is safe:
+# a 2-3 point window drawn from repeated raw readings can land at std ~1e-17 (machine
+# epsilon), arbitrarily below any tolerance we pick. aeon's own numeric code already
+# treats anything under AEON_NUMBA_STD_THRESHOLD (1e-8) as safe-to-treat-as-constant,
+# so match the upstream fix (aeon PR #3598): demote the check to a warning instead.
+_original_check_collection_variance = _base_collection.check_collection_variance
+
+
+def _lenient_check_collection_variance(X, threshold=1e-7, raise_error=True):
+    return _original_check_collection_variance(X, threshold=threshold, raise_error=False)
+
+
+_base_collection.check_collection_variance = _lenient_check_collection_variance
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -34,12 +57,89 @@ AVAILABLE_CLASSIFIERS = [
     "TSCGlue-Accuracy-GPU",
     "TSCGlue-LogLoss-GPU",
     "TSCGlue-ROCAUC-GPU",
+    "TSCGlueWeaselV2-Accuracy-GPU",
+    "TSCGlueWeaselV2-LogLoss-GPU",
+    "TSCGlueWeaselV2-ROCAUC-GPU",
+    "TSCGlueDual-Accuracy-GPU",
+    "TSCGlueDual-LogLoss-GPU",
+    "TSCGlueDual-ROCAUC-GPU",
+    "TSCGlueMean-GPU",
+    "TSCGlueMeanV2-GPU",
+    "TSCGlueMeanBalanced-GPU",
+    "TSCGlueET-GPU",
+    "TSCGlueETAll-GPU",
+    "TSCGlueETAllV2-GPU",
+    "TSCGlueRidgeAll-GPU",
+    # TSCGlueEnhanced — one class, three presets (low/medium/high)
+    "TSCGlueEnhanced-Low-LogLoss-GPU",
+    "TSCGlueEnhanced-Medium-LogLoss-GPU",
+    "TSCGlueEnhanced-High-LogLoss-GPU",
+    # TSCGlueEnhancedV2 — full preset x eval_metric grid (served head depends on both)
+    "TSCGlueEnhancedV2-Low-Accuracy-GPU",
+    "TSCGlueEnhancedV2-Low-F1-GPU",
+    "TSCGlueEnhancedV2-Low-ROCAUC-GPU",
+    "TSCGlueEnhancedV2-Low-LogLoss-GPU",
+    "TSCGlueEnhancedV2-Medium-Accuracy-GPU",
+    "TSCGlueEnhancedV2-Medium-F1-GPU",
+    "TSCGlueEnhancedV2-Medium-ROCAUC-GPU",
+    "TSCGlueEnhancedV2-Medium-LogLoss-GPU",
+    "TSCGlueEnhancedV2-High-Accuracy-GPU",
+    "TSCGlueEnhancedV2-High-F1-GPU",
+    "TSCGlueEnhancedV2-High-ROCAUC-GPU",
+    "TSCGlueEnhancedV2-High-LogLoss-GPU",
+    # tscglue.fallback feature-pipeline baselines (fallback candidates)
+    "f-QuantET",
+    "f-MultiET",
+    "f-MRHydraET",
+    "f-ShapeDictET",
+    "f-AllFeaturesET",
+    "f-MRHydraLogistic",
+    "f-MRHydraRidge",
+    "f-AllFeaturesRidge",
 ]
 
 
 def make_classifier(name: str, random_state: int, n_jobs: int):
-    from tscglue.models import TSCGlueClassifier
+    from tscglue.fallback import BASELINES
+    from tscglue.models import (
+        TSCGlueClassifier,
+        TSCGlueDual,
+        TSCGlueEnhanced,
+        TSCGlueEnhancedV2,
+        TSCGlueET,
+        TSCGlueETAll,
+        TSCGlueETAllV2,
+        TSCGlueMean,
+        TSCGlueMeanBalanced,
+        TSCGlueMeanV2,
+        TSCGlueRidgeAll,
+        TSCGlueWeaselV2,
+    )
 
+    if name.startswith("f-") and name[2:] in BASELINES:
+        return BASELINES[name[2:]](random_state=random_state, n_jobs=n_jobs, verbose=1)
+    if name.startswith("TSCGlueEnhancedV2-") and name.endswith("-GPU"):
+        # TSCGlueEnhancedV2-<Preset>-<Metric>-GPU, e.g. TSCGlueEnhancedV2-High-F1-GPU.
+        # Unlike V1, every preset x metric pair is a distinct served head, so all
+        # 12 combinations are worth running.
+        import torch
+        _preset, _metric = name[len("TSCGlueEnhancedV2-"):-len("-GPU")].split("-")
+        _metric_map = {"Accuracy": "accuracy", "F1": "f1", "LogLoss": "log_loss", "ROCAUC": "roc_auc"}
+        return TSCGlueEnhancedV2(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+            eval_metric=_metric_map[_metric], preset=_preset.lower(),
+        )
+    if name.startswith("TSCGlueEnhanced-") and name.endswith("-GPU"):
+        # TSCGlueEnhanced-<Preset>-<Metric>-GPU, e.g. TSCGlueEnhanced-Low-LogLoss-GPU
+        import torch
+        _preset, _metric = name[len("TSCGlueEnhanced-"):-len("-GPU")].split("-")
+        _metric_map = {"Accuracy": "accuracy", "LogLoss": "log_loss", "ROCAUC": "roc_auc"}
+        return TSCGlueEnhanced(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+            eval_metric=_metric_map[_metric], preset=_preset.lower(),
+        )
     if name == "TSCGlue-Accuracy-GPU":
         import torch
         return TSCGlueClassifier(
@@ -57,6 +157,84 @@ def make_classifier(name: str, random_state: int, n_jobs: int):
         return TSCGlueClassifier(
             verbose=10, random_state=random_state, n_jobs=n_jobs,
             n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
+        )
+    if name == "TSCGlueWeaselV2-Accuracy-GPU":
+        import torch
+        return TSCGlueWeaselV2(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="accuracy",
+        )
+    if name == "TSCGlueWeaselV2-LogLoss-GPU":
+        import torch
+        return TSCGlueWeaselV2(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="log_loss",
+        )
+    if name == "TSCGlueWeaselV2-ROCAUC-GPU":
+        import torch
+        return TSCGlueWeaselV2(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
+        )
+    if name == "TSCGlueDual-Accuracy-GPU":
+        import torch
+        return TSCGlueDual(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="accuracy",
+        )
+    if name == "TSCGlueDual-LogLoss-GPU":
+        import torch
+        return TSCGlueDual(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="log_loss",
+        )
+    if name == "TSCGlueDual-ROCAUC-GPU":
+        import torch
+        return TSCGlueDual(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
+        )
+    if name == "TSCGlueMean-GPU":
+        import torch
+        return TSCGlueMean(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+        )
+    if name == "TSCGlueMeanV2-GPU":
+        import torch
+        return TSCGlueMeanV2(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+        )
+    if name == "TSCGlueMeanBalanced-GPU":
+        import torch
+        return TSCGlueMeanBalanced(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+        )
+    if name == "TSCGlueET-GPU":
+        import torch
+        return TSCGlueET(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+        )
+    if name == "TSCGlueETAll-GPU":
+        import torch
+        return TSCGlueETAll(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+        )
+    if name == "TSCGlueETAllV2-GPU":
+        import torch
+        return TSCGlueETAllV2(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
+        )
+    if name == "TSCGlueRidgeAll-GPU":
+        import torch
+        return TSCGlueRidgeAll(
+            verbose=10, random_state=random_state, n_jobs=n_jobs,
+            n_gpus=torch.cuda.device_count(),
         )
     return _set_bakeoff_classifier(name, random_state=random_state, n_jobs=n_jobs)
 
@@ -147,9 +325,9 @@ def main(
         random.shuffle(combos)
         click.echo(f"\nRunning {len(combos)} experiments...\n")
 
-        for clf_name, dataset, r in combos:
+        for i, (clf_name, dataset, r) in enumerate(combos, start=1):
             try:
-                click.echo(f"{clf_name}  {dataset}  resample={r}")
+                click.echo(f"[{i}/{len(combos)}] {clf_name}  {dataset}  resample={r}")
                 load_and_run_classification_experiment(
                     data_dir,
                     str(output_dir),
