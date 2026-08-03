@@ -1,5 +1,10 @@
 #!/bin/bash
-# Submit benchmark jobs. Usage: bash scripts/submit_benchmark.sh
+# Submit benchmark jobs. Usage: bash scripts/submit_benchmark.sh [run_timing]
+#
+# run_timing defaults to 1, which also submits the CPU timing sweep. Pass 0 to submit
+# only the accuracy jobs:
+#   bash scripts/submit_benchmark.sh 0
+RUN_TIMING=${1:-1}
 
 mkdir -p logs
 
@@ -14,6 +19,19 @@ sbatch --cpus-per-task=4 --mem=32G --array=0-2 --time-min=04:00:00 --gres=gpu:1 
 sbatch --cpus-per-task=4 --mem=32G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-LogLoss-GPU
 sbatch --cpus-per-task=4 --mem=32G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU
 sbatch --cpus-per-task=4 --mem=32G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU
+
+# Return again with more memory as some of the larger datasets are running out of memory with 32G
+sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
+sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-LogLoss-GPU
+sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-Accuracy-GPU
+sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-LogLoss-GPU
+sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU
+sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU
+
+if [ "$RUN_TIMING" != "1" ]; then
+    echo "RUN_TIMING=$RUN_TIMING — skipping CPU timing sweep."
+    exit 0
+fi
 
 # CPU timing, 1 core — fold 0, own -o per core count so nothing is skipped as already built
 sbatch --cpus-per-task=1 --mem=32G --array=0 --time=72:00:00 --time-min=04:00:00 --export=ALL,CUDA_VISIBLE_DEVICES= \
@@ -70,11 +88,3 @@ sbatch --cpus-per-task=8 --mem=32G --array=0 --time=72:00:00 --time-min=04:00:00
     scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU -o model_results_timing_cpu_c8
 sbatch --cpus-per-task=8 --mem=32G --array=0 --time=72:00:00 --time-min=04:00:00 --export=ALL,CUDA_VISIBLE_DEVICES= \
     scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU -o model_results_timing_cpu_c8
-
-# Return again with more memory as some of the larger datasets are running out of memory with 32G
-sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
-sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-LogLoss-GPU
-sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-Accuracy-GPU
-sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-LogLoss-GPU
-sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU
-sbatch --cpus-per-task=4 --mem=64G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU
