@@ -4,7 +4,8 @@
 mkdir -p logs
 
 # CPU baselines
-sbatch --cpus-per-task=8 --mem=32G --array=0-2 --time-min=04:00:00 scripts/run_benchmark2.slurm -c ROCKET,MiniRocket,MultiRocketHydra,Catch22
+sbatch --cpus-per-task=8 --mem=32G --array=0-2 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2,ROCKET,MiniRocket,MultiRocketHydra,Catch22
+sbatch --cpus-per-task=8 --mem=32G --array=0-2 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2,ROCKET,MiniRocket,MultiRocketHydra,Catch22
 
 # TSCGlueEnhancedV2 accuracy — GPU, folds 0-2 (accuracy + log_loss cover all four metrics)
 sbatch --cpus-per-task=4 --mem=32G --array=0-2 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
