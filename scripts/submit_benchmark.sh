@@ -14,7 +14,6 @@ GPU_OPTS="$COMMON_OPTS --gres=gpu:1 --nodelist=compute01"
 
 # CPU baselines
 sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c ROCKET,MiniRocket,MultiRocketHydra,Catch22
-sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c HIVECOTEV2,ROCKET,MiniRocket,MultiRocketHydra,Catch22
 
 # TSCGlueEnhancedV2 accuracy — GPU, folds 0-2 (accuracy + log_loss cover all four metrics)
 sbatch $GPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
@@ -38,6 +37,8 @@ sbatch $GPU_OPTS --mem=64G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Med
 sbatch $GPU_OPTS --mem=64G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-LogLoss-GPU
 sbatch $GPU_OPTS --mem=64G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU
 sbatch $GPU_OPTS --mem=64G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU
+
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c HIVECOTEV2,ROCKET,MiniRocket,MultiRocketHydra,Catch22
 
 # if [ "$RUN_TIMING" != "1" ]; then
 #     echo "RUN_TIMING=$RUN_TIMING — skipping CPU timing sweep."
