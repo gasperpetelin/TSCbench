@@ -24,6 +24,13 @@ sbatch $GPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Med
 sbatch $GPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU
 sbatch $GPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU
 
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-LogLoss-GPU
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-Accuracy-GPU
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-LogLoss-GPU
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-Accuracy-GPU
+sbatch $CPU_OPTS --mem=32G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-High-LogLoss-GPU
+
 # Return again with more memory as some of the larger datasets are running out of memory with 32G
 sbatch $GPU_OPTS --mem=64G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
 sbatch $GPU_OPTS --mem=64G scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-LogLoss-GPU
