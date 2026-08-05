@@ -327,12 +327,14 @@ def main(
 
         for i, (clf_name, dataset, r) in enumerate(combos, start=1):
             try:
+                clf = make_classifier(clf_name, random_state=r, n_jobs=n_jobs)
                 click.echo(f"[{i}/{len(combos)}] {clf_name}  {dataset}  resample={r}")
+                click.echo(f"    {clf!r}")
                 load_and_run_classification_experiment(
                     data_dir,
                     str(output_dir),
                     dataset,
-                    make_classifier(clf_name, random_state=r, n_jobs=n_jobs),
+                    clf,
                     classifier_name=clf_name,
                     resample_id=r,
                     predefined_resample=True,
