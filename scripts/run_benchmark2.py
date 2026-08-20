@@ -3,12 +3,12 @@
 Examples:
     uv run python scripts/run_benchmark2.py --classifiers ROCKET,Catch22 --folds 0
     uv run python scripts/run_benchmark2.py --classifiers TSCGlue-Accuracy-GPU --datasets Crop --folds 0,1,2
-    uv run python scripts/run_benchmark2.py --evaluate-only
 """
 
 import os
 import random
 import sys
+import tempfile
 from itertools import product
 from pathlib import Path
 
@@ -57,185 +57,60 @@ AVAILABLE_CLASSIFIERS = [
     "TSCGlue-Accuracy-GPU",
     "TSCGlue-LogLoss-GPU",
     "TSCGlue-ROCAUC-GPU",
-    "TSCGlueWeaselV2-Accuracy-GPU",
-    "TSCGlueWeaselV2-LogLoss-GPU",
-    "TSCGlueWeaselV2-ROCAUC-GPU",
-    "TSCGlueDual-Accuracy-GPU",
-    "TSCGlueDual-LogLoss-GPU",
-    "TSCGlueDual-ROCAUC-GPU",
-    "TSCGlueMean-GPU",
-    "TSCGlueMeanV2-GPU",
-    "TSCGlueMeanBalanced-GPU",
-    "TSCGlueET-GPU",
-    "TSCGlueETAll-GPU",
-    "TSCGlueETAllV2-GPU",
-    "TSCGlueRidgeAll-GPU",
-    # TSCGlueEnhanced — one class, three presets (low/medium/high)
-    "TSCGlueEnhanced-Low-LogLoss-GPU",
-    "TSCGlueEnhanced-Medium-LogLoss-GPU",
-    "TSCGlueEnhanced-High-LogLoss-GPU",
-    # TSCGlueEnhancedV2 — full preset x eval_metric grid (served head depends on both)
-    "TSCGlueEnhancedV2-Low-Accuracy-GPU",
-    "TSCGlueEnhancedV2-Low-F1-GPU",
-    "TSCGlueEnhancedV2-Low-ROCAUC-GPU",
-    "TSCGlueEnhancedV2-Low-LogLoss-GPU",
-    "TSCGlueEnhancedV2-Medium-Accuracy-GPU",
-    "TSCGlueEnhancedV2-Medium-F1-GPU",
-    "TSCGlueEnhancedV2-Medium-ROCAUC-GPU",
-    "TSCGlueEnhancedV2-Medium-LogLoss-GPU",
-    "TSCGlueEnhancedV2-High-Accuracy-GPU",
-    "TSCGlueEnhancedV2-High-F1-GPU",
-    "TSCGlueEnhancedV2-High-ROCAUC-GPU",
-    "TSCGlueEnhancedV2-High-LogLoss-GPU",
-    # tscglue.fallback feature-pipeline baselines (fallback candidates)
-    "f-QuantET",
-    "f-MultiET",
-    "f-MRHydraET",
-    "f-ShapeDictET",
-    "f-AllFeaturesET",
-    "f-MRHydraLogistic",
-    "f-MRHydraRidge",
-    "f-AllFeaturesRidge",
+    # TSCGlueEnhancedV4 — full preset x eval_metric grid is accepted (F1/ROCAUC
+    # included), but only the two headline metrics are benchmarked.
+    "TSCGlueEnhancedV4-Low-Accuracy-GPU",
+    "TSCGlueEnhancedV4-Low-LogLoss-GPU",
+    "TSCGlueEnhancedV4-Medium-Accuracy-GPU",
+    "TSCGlueEnhancedV4-Medium-LogLoss-GPU",
+    "TSCGlueEnhancedV4-High-Accuracy-GPU",
+    "TSCGlueEnhancedV4-High-LogLoss-GPU",
 ]
 
 
-def make_classifier(name: str, random_state: int, n_jobs: int):
-    from tscglue.fallback import BASELINES
-    from tscglue.models import (
-        TSCGlueClassifier,
-        TSCGlueDual,
-        TSCGlueEnhanced,
-        TSCGlueEnhancedV2,
-        TSCGlueET,
-        TSCGlueETAll,
-        TSCGlueETAllV2,
-        TSCGlueMean,
-        TSCGlueMeanBalanced,
-        TSCGlueMeanV2,
-        TSCGlueRidgeAll,
-        TSCGlueWeaselV2,
-    )
+def make_classifier(name: str, random_state: int, n_jobs: int, runs_dir=None):
+    # tscglue models write fold-model pickles and feature caches under
+    # `<runs_dir>/<run_id>/`, defaulting to ./tscglue_runs. Only the feature caches
+    # are cleaned up on their own; the pickles are not. `runs_dir` points them at a
+    # per-experiment temp dir so the caller can delete the lot in one go.
+    from tscglue.models import TSCGlueClassifier, TSCGlueEnhancedV4
 
-    if name.startswith("f-") and name[2:] in BASELINES:
-        return BASELINES[name[2:]](random_state=random_state, n_jobs=n_jobs, verbose=1)
-    if name.startswith("TSCGlueEnhancedV2-") and name.endswith("-GPU"):
-        # TSCGlueEnhancedV2-<Preset>-<Metric>-GPU, e.g. TSCGlueEnhancedV2-High-F1-GPU.
-        # Unlike V1, every preset x metric pair is a distinct served head, so all
-        # 12 combinations are worth running.
+    if name.startswith("TSCGlueEnhancedV4-") and name.endswith("-GPU"):
+        # TSCGlueEnhancedV4-<Preset>-<Metric>-GPU, e.g. TSCGlueEnhancedV4-High-LogLoss-GPU.
         import torch
-        _preset, _metric = name[len("TSCGlueEnhancedV2-"):-len("-GPU")].split("-")
+        _preset, _metric = name[len("TSCGlueEnhancedV4-"):-len("-GPU")].split("-")
         _metric_map = {"Accuracy": "accuracy", "F1": "f1", "LogLoss": "log_loss", "ROCAUC": "roc_auc"}
-        return TSCGlueEnhancedV2(
+        return TSCGlueEnhancedV4(
             verbose=10, random_state=random_state, n_jobs=n_jobs,
             n_gpus=torch.cuda.device_count(),
             eval_metric=_metric_map[_metric], preset=_preset.lower(),
-        )
-    if name.startswith("TSCGlueEnhanced-") and name.endswith("-GPU"):
-        # TSCGlueEnhanced-<Preset>-<Metric>-GPU, e.g. TSCGlueEnhanced-Low-LogLoss-GPU
-        import torch
-        _preset, _metric = name[len("TSCGlueEnhanced-"):-len("-GPU")].split("-")
-        _metric_map = {"Accuracy": "accuracy", "LogLoss": "log_loss", "ROCAUC": "roc_auc"}
-        return TSCGlueEnhanced(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-            eval_metric=_metric_map[_metric], preset=_preset.lower(),
+            runs_dir=runs_dir,
+            # Cap cases in flight at predict time so peak RAM and run-dir disk
+            # scale with the batch rather than with len(X).
+            predict_batch_size=1000,
         )
     if name == "TSCGlue-Accuracy-GPU":
         import torch
         return TSCGlueClassifier(
             verbose=10, random_state=random_state, n_jobs=n_jobs,
             n_gpus=torch.cuda.device_count(), eval_metric="accuracy",
+            runs_dir=runs_dir,
         )
     if name == "TSCGlue-LogLoss-GPU":
         import torch
         return TSCGlueClassifier(
             verbose=10, random_state=random_state, n_jobs=n_jobs,
             n_gpus=torch.cuda.device_count(), eval_metric="log_loss",
+            runs_dir=runs_dir,
         )
     if name == "TSCGlue-ROCAUC-GPU":
         import torch
         return TSCGlueClassifier(
             verbose=10, random_state=random_state, n_jobs=n_jobs,
             n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
+            runs_dir=runs_dir,
         )
-    if name == "TSCGlueWeaselV2-Accuracy-GPU":
-        import torch
-        return TSCGlueWeaselV2(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(), eval_metric="accuracy",
-        )
-    if name == "TSCGlueWeaselV2-LogLoss-GPU":
-        import torch
-        return TSCGlueWeaselV2(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(), eval_metric="log_loss",
-        )
-    if name == "TSCGlueWeaselV2-ROCAUC-GPU":
-        import torch
-        return TSCGlueWeaselV2(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
-        )
-    if name == "TSCGlueDual-Accuracy-GPU":
-        import torch
-        return TSCGlueDual(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(), eval_metric="accuracy",
-        )
-    if name == "TSCGlueDual-LogLoss-GPU":
-        import torch
-        return TSCGlueDual(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(), eval_metric="log_loss",
-        )
-    if name == "TSCGlueDual-ROCAUC-GPU":
-        import torch
-        return TSCGlueDual(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
-        )
-    if name == "TSCGlueMean-GPU":
-        import torch
-        return TSCGlueMean(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
-    if name == "TSCGlueMeanV2-GPU":
-        import torch
-        return TSCGlueMeanV2(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
-    if name == "TSCGlueMeanBalanced-GPU":
-        import torch
-        return TSCGlueMeanBalanced(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
-    if name == "TSCGlueET-GPU":
-        import torch
-        return TSCGlueET(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
-    if name == "TSCGlueETAll-GPU":
-        import torch
-        return TSCGlueETAll(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
-    if name == "TSCGlueETAllV2-GPU":
-        import torch
-        return TSCGlueETAllV2(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
-    if name == "TSCGlueRidgeAll-GPU":
-        import torch
-        return TSCGlueRidgeAll(
-            verbose=10, random_state=random_state, n_jobs=n_jobs,
-            n_gpus=torch.cuda.device_count(),
-        )
+    # Bakeoff classifiers keep no run dir of their own, so runs_dir does not apply.
     return _set_bakeoff_classifier(name, random_state=random_state, n_jobs=n_jobs)
 
 
@@ -275,32 +150,16 @@ def make_classifier(name: str, random_state: int, n_jobs: int):
     type=click.Path(path_type=Path),
     help="Directory for tsml-format prediction files.",
 )
-@click.option(
-    "--results-dir",
-    default="generated_results",
-    show_default=True,
-    type=click.Path(path_type=Path),
-    help="Directory for summary CSVs and critical-difference diagrams.",
-)
 @click.option("-j", "--n-jobs", default=8, show_default=True, type=int)
 @click.option("--overwrite", is_flag=True, help="Re-run and overwrite existing results.")
-@click.option("--evaluate", is_flag=True, help="Run evaluation after benchmarking.")
-@click.option(
-    "--evaluate-only",
-    is_flag=True,
-    help="Skip benchmarking; only run evaluation on existing results.",
-)
 def main(
     classifiers,
     datasets,
     folds,
     data_dir,
     output_dir,
-    results_dir,
     n_jobs,
     overwrite,
-    evaluate,
-    evaluate_only,
 ):
     classifier_names = [c.strip() for c in classifiers.split(",") if c.strip()]
     dataset_list = (
@@ -320,14 +179,18 @@ def main(
     click.echo(f"Data dir:    {data_dir}")
     click.echo(f"Output dir:  {output_dir}")
 
-    if not evaluate_only:
-        combos = list(product(classifier_names, dataset_list, fold_ids))
-        random.shuffle(combos)
-        click.echo(f"\nRunning {len(combos)} experiments...\n")
+    combos = list(product(classifier_names, dataset_list, fold_ids))
+    random.shuffle(combos)
+    click.echo(f"\nRunning {len(combos)} experiments...\n")
 
-        for i, (clf_name, dataset, r) in enumerate(combos, start=1):
-            try:
-                clf = make_classifier(clf_name, random_state=r, n_jobs=n_jobs)
+    for i, (clf_name, dataset, r) in enumerate(combos, start=1):
+        try:
+            # Everything the model writes goes under this dir, so it is gone by the
+            # time the next experiment starts -- crashed runs included.
+            with tempfile.TemporaryDirectory() as run_dir:
+                clf = make_classifier(
+                    clf_name, random_state=r, n_jobs=n_jobs, runs_dir=run_dir
+                )
                 click.echo(f"[{i}/{len(combos)}] {clf_name}  {dataset}  resample={r}")
                 click.echo(f"    {clf!r}")
                 load_and_run_classification_experiment(
@@ -340,22 +203,8 @@ def main(
                     predefined_resample=True,
                     overwrite=overwrite,
                 )
-            except Exception as exc:
-                click.echo(
-                    f"ERROR {clf_name} {dataset} resample={r}: {exc}", err=True
-                )
-
-    if evaluate or evaluate_only:
-        from tsml_eval.evaluation import evaluate_classifiers_by_problem
-
-        click.echo(f"\nEvaluating results -> {results_dir}")
-        evaluate_classifiers_by_problem(
-            str(output_dir),
-            classifier_names,
-            dataset_list,
-            str(results_dir),
-            resamples=len(fold_ids),
-        )
+        except Exception as exc:
+            click.echo(f"ERROR {clf_name} {dataset} resample={r}: {exc}", err=True)
 
 
 if __name__ == "__main__":

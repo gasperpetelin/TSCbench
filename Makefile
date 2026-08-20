@@ -8,6 +8,7 @@ install-uv:  ## Install uv package manager
 	curl -LsSf https://astral.sh/uv/install.sh | sh
 
 setup:  ## Install base dependencies + tscglue (no PyTorch)
+	export UV_LINK_MODE=copy
 	rm -f uv.lock
 	uv sync
 	uv pip install "tscglue @ git+https://github.com/gasperpetelin/TSCGlue@main"
@@ -20,6 +21,7 @@ setup-cpu:  ## Install tscglue with CPU PyTorch
 	uv pip install pytorch-lightning chronos-forecasting "mantis-tsfm>=1.0.0" transformers accelerate
 
 setup-cuda:  ## Install tscglue with CUDA 12.4 PyTorch
+	export UV_LINK_MODE=copy
 	rm -f uv.lock
 	uv sync
 	uv pip install torch --index-url https://download.pytorch.org/whl/cu124
