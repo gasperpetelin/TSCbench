@@ -1,11 +1,10 @@
 #!/bin/bash
 
-mkdir -p logs
 
 # CPU baselines
-sbatch --cpus-per-task=4 --mem=32G --array=0-1 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
-sbatch --cpus-per-task=4 --mem=32G --array=0-1 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
-sbatch --cpus-per-task=4 --mem=32G --array=0-1 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c Catch22
+sbatch --reservation=e7 --cpus-per-task=4 --mem=32G --array=0-1 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
+sbatch --reservation=e7 --cpus-per-task=4 --mem=32G --array=0-1 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
+sbatch --reservation=e7 --cpus-per-task=4 --mem=32G --array=0-1 --time=72:00:00 --time-min=04:00:00 scripts/run_benchmark2.slurm -c Catch22
 
 
 #sbatch --cpus-per-task=4 --mem=32G --array=0-5 --time=72:00:00 --time-min=04:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-Accuracy-GPU
