@@ -22,10 +22,12 @@ dependencies = [
     "psutil",
     "numpy<2.4",
     "tsml-eval",
-    "aeon>=1.4.0,<1.5.0"
+    "aeon>=1.5.0,<1.6.0",
+    "tscglue"
 ]
 
 [tool.uv.sources]
+tscglue = { git = "https://github.com/gasperpetelin/TSCGlue", branch = "main" }
 tsml-eval = { git = "https://github.com/time-series-machine-learning/tsml-eval", branch = "main" }
 tsml = { git = "https://github.com/time-series-machine-learning/tsml-py", branch = "main" }
 
