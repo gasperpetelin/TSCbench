@@ -35,6 +35,7 @@ clean: ## Removes env, docs and caches
 	rm -rf build/docs
 	rm -rf ~/.exturion
 	rm -rf .venv
+	rm -f uv.lock
 	uv clean all
 	uv cache clean
 
