@@ -183,11 +183,14 @@ def main(
     random.shuffle(combos)
     click.echo(f"\nRunning {len(combos)} experiments...\n")
 
+    runs_root = Path("tscglue_runs")
+    runs_root.mkdir(exist_ok=True)
+
     for i, (clf_name, dataset, r) in enumerate(combos, start=1):
         try:
             # Everything the model writes goes under this dir, so it is gone by the
             # time the next experiment starts -- crashed runs included.
-            with tempfile.TemporaryDirectory() as run_dir:
+            with tempfile.TemporaryDirectory(dir=runs_root) as run_dir:
                 clf = make_classifier(
                     clf_name, random_state=r, n_jobs=n_jobs, runs_dir=run_dir
                 )
