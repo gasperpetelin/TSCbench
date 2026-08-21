@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# --time is the *restart interval*, not the budget: run_benchmark2.slurm requeues
-# itself 5 min before the limit and resumes at dataset granularity, so the only
-# rule is that --time must clear the classifier's slowest single dataset.
-# Measured worst case (fit+predict, from model_results): Catch22 0.01h,
-# ROCKET 0.16h, MultiRocketHydra 0.18h, TSCGlueV4 Low/Med/High 1.8/3.2/5.0h,
-# HIVECOTEV2 69.7h (ElectricDevices).
-
 COMMON=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-1 --time-min=01:00:00)
 COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-1 --time-min=01:00:00)
 
