@@ -6,10 +6,10 @@ COMMON1=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-10 --time
 COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
 
 # CPU baselines
+sbatch "${COMMONHC[@]}" --time=72:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c Catch22
-sbatch "${COMMONHC[@]}" --time=72:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2
 
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
