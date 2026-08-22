@@ -1,5 +1,6 @@
 #!/bin/bash
 
+COMMONHC=(--reservation=e7 --cpus-per-task=1 --mem-per-cpu=12G --array=0-10 --time-min=01:00:00)
 COMMON0=(--reservation=e7 --cpus-per-task=2 --mem-per-cpu=2G --array=0-10 --time-min=01:00:00)
 COMMON1=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
 COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
@@ -8,12 +9,11 @@ COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --tim
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c Catch22
-sbatch "${COMMON0[@]}" --time=72:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2
+sbatch "${COMMONHC[@]}" --time=72:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2
 
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c Catch22
-sbatch "${COMMON1[@]}" --time=72:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2
 
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Low-Accuracy-GPU
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Medium-Accuracy-GPU

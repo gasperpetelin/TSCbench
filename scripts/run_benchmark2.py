@@ -110,6 +110,21 @@ def make_classifier(name: str, random_state: int, n_jobs: int, runs_dir=None):
             n_gpus=torch.cuda.device_count(), eval_metric="roc_auc",
             runs_dir=runs_dir,
         )
+    if name == "HIVECOTEV2":
+        # DrCIF is the only HC2 component that does not ask joblib for threads, so at
+        # n_jobs > 1 it fans out over loky processes. Those are fresh interpreters: they
+        # re-import aeon and lose the variance patch above, and the strict check then
+        # kills the fit from inside a worker. Pin DrCIF to threads so the ensemble stays
+        # in one process -- STC/Arsenal/TDE already pass prefer="threads". n_estimators
+        # has to be restated: HC2 replaces its default drcif_params dict, not merges it.
+        return HIVECOTEV2(
+            random_state=random_state,
+            n_jobs=n_jobs,
+            drcif_params={
+                "n_estimators": HIVECOTEV2._DEFAULT_N_TREES,
+                "parallel_backend": "threading",
+            },
+        )
     # Bakeoff classifiers keep no run dir of their own, so runs_dir does not apply.
     return _set_bakeoff_classifier(name, random_state=random_state, n_jobs=n_jobs)
 
