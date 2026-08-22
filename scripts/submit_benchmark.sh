@@ -1,7 +1,7 @@
 #!/bin/bash
 
-COMMON=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-1 --time-min=01:00:00)
-COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-1 --time-min=01:00:00)
+COMMON=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
+COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
 
 # CPU baselines
 sbatch "${COMMON[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
