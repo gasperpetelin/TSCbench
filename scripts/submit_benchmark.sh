@@ -1,12 +1,17 @@
 #!/bin/bash
 
-COMMONHC=(--reservation=e7 --cpus-per-task=1 --mem-per-cpu=12G --array=0-10 --time-min=01:00:00)
+COMMONHC=(--cpus-per-task=1 --array=0-10)
 COMMON0=(--reservation=e7 --cpus-per-task=2 --mem-per-cpu=2G --array=0-10 --time-min=01:00:00)
 COMMON1=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
 COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
 
 # CPU baselines
-sbatch "${COMMONHC[@]}" --time=72:00:00 scripts/run_benchmark2.slurm -c HIVECOTEV2
+sbatch "${COMMONHC[@]}" --time=72:00:00 --mem-per-cpu=6G scripts/run_benchmark2.slurm -c HIVECOTEV2
+sbatch "${COMMONHC[@]}" --time=72:00:00 --mem-per-cpu=6G --reservation=e7 scripts/run_benchmark2.slurm -c HIVECOTEV2
+
+sbatch "${COMMONHC[@]}" --time=72:00:00 --mem-per-cpu=12G scripts/run_benchmark2.slurm -c HIVECOTEV2
+sbatch "${COMMONHC[@]}" --time=72:00:00 --mem-per-cpu=12G --reservation=e7 scripts/run_benchmark2.slurm -c HIVECOTEV2
+
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
 sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c Catch22
