@@ -6,6 +6,9 @@ COMMON1=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-10 --time
 COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
 
 # CPU baselines
+sbatch "${COMMONHC[@]}" --time=72:00:00 --time-min=06:00:00 --mem-per-cpu=6G scripts/run_benchmark2.slurm -c HIVECOTEV2
+sbatch "${COMMONHC[@]}" --time=72:00:00 --time-min=06:00:00 --mem-per-cpu=6G --reservation=e7 scripts/run_benchmark2.slurm -c HIVECOTEV2
+sleep 2
 sbatch "${COMMONHC[@]}" --time=72:00:00 --time-min=24:00:00 --mem-per-cpu=6G scripts/run_benchmark2.slurm -c HIVECOTEV2
 sbatch "${COMMONHC[@]}" --time=72:00:00 --time-min=24:00:00 --mem-per-cpu=6G --reservation=e7 scripts/run_benchmark2.slurm -c HIVECOTEV2
 sleep 2
