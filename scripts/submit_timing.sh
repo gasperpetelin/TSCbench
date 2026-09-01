@@ -7,7 +7,7 @@
 # Fixed --mem for every job: memory has to be constant across the sweep or it
 # confounds the CPU-count comparison. Each config writes its own results dir.
 
-COMMON=(--nodes=1 --nodelist=nsc-vfp003,nsc-vfp004 --gres=gpu:1 --mem=84G --time=72:00:00)
+COMMON=(--nodes=1 --nodelist=nsc-vfp003,nsc-vfp004 --gres=gpu:1 --mem=84G --time=72:00:00 --reservation=e7)
 NOGPU="--export=ALL,TIMING_NO_GPU=1"
 O=timing_results
 
