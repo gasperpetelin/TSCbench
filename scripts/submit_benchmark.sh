@@ -26,6 +26,16 @@ sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c ROCKET
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c MultiRocketHydra
 sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c Catch22
 sleep 2
+sbatch "${COMMON0[@]}" --time=24:00:00 scripts/run_benchmark2.slurm -c WEASEL_V2
+sbatch "${COMMON0[@]}" --time=24:00:00 scripts/run_benchmark2.slurm -c FreshPRINCE
+sbatch "${COMMON0[@]}" --time=24:00:00 scripts/run_benchmark2.slurm -c RDST
+sbatch "${COMMON0[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c QUANT
+sleep 2
+sbatch "${COMMON1[@]}" --time=24:00:00 scripts/run_benchmark2.slurm -c WEASEL_V2
+sbatch "${COMMON1[@]}" --time=24:00:00 scripts/run_benchmark2.slurm -c FreshPRINCE
+sbatch "${COMMON1[@]}" --time=24:00:00 scripts/run_benchmark2.slurm -c RDST
+sbatch "${COMMON1[@]}" --time=04:00:00 scripts/run_benchmark2.slurm -c QUANT
+sleep 2
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Low-Accuracy-GPU
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Medium-Accuracy-GPU
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-High-Accuracy-GPU

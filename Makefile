@@ -1,8 +1,8 @@
-.PHONY: help install-uv setup setup-cpu setup-cuda list clean tests format
+.PHONY: help install-uv setup setup-cpu setup-cuda-124 setup-cuda-132 list clean tests format
 .ONESHELL:
 
 help:   ## Show available commands
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 install-uv:  ## Install uv package manager
 	curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -20,12 +20,20 @@ setup-cpu:  ## Install tscglue with CPU PyTorch
 	uv pip install "tscglue[cpu] @ git+https://github.com/gasperpetelin/TSCGlue@main"
 	uv pip install pytorch-lightning chronos-forecasting "mantis-tsfm>=1.0.0" transformers accelerate
 
-setup-cuda:  ## Install tscglue with CUDA 12.4 PyTorch
+setup-cuda-124:  ## Install tscglue with CUDA 12.4 PyTorch (up to sm_90)
 	export UV_LINK_MODE=copy
 	rm -f uv.lock
 	uv sync
 	uv pip install torch --index-url https://download.pytorch.org/whl/cu124
 	uv pip install "tscglue[cu124] @ git+https://github.com/gasperpetelin/TSCGlue@main"
+	uv pip install pytorch-lightning chronos-forecasting "mantis-tsfm>=1.0.0" transformers accelerate
+
+setup-cuda-132:  ## Install tscglue with CUDA 13.2 PyTorch (sm_75 to sm_120, Blackwell)
+	export UV_LINK_MODE=copy
+	rm -f uv.lock
+	uv sync
+	uv pip install torch --index-url https://download.pytorch.org/whl/cu132
+	uv pip install "tscglue @ git+https://github.com/gasperpetelin/TSCGlue@main"
 	uv pip install pytorch-lightning chronos-forecasting "mantis-tsfm>=1.0.0" transformers accelerate
 
 list:
