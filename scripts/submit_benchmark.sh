@@ -1,9 +1,9 @@
 #!/bin/bash
 
-COMMONHC=(--cpus-per-task=1 --array=0-10)
-COMMON0=(--reservation=e7 --cpus-per-task=2 --mem-per-cpu=2G --array=0-10 --time-min=01:00:00)
-COMMON1=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
-COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-10 --time-min=01:00:00)
+COMMONHC=(--cpus-per-task=1 --array=0-15)
+COMMON0=(--reservation=e7 --cpus-per-task=2 --mem-per-cpu=2G --array=0-15 --time-min=01:00:00)
+COMMON1=(--reservation=e7 --cpus-per-task=4 --mem-per-cpu=8G --array=0-15 --time-min=01:00:00)
+COMMON2=(--reservation=e7 --cpus-per-task=24 --mem-per-cpu=8G --array=0-15 --time-min=01:00:00)
 
 # CPU baselines
 sbatch "${COMMONHC[@]}" --time=72:00:00 --time-min=06:00:00 --mem-per-cpu=6G scripts/run_benchmark2.slurm -c HIVECOTEV2
