@@ -33,4 +33,3 @@ sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=1  scripts/run_timing.slurm -c Mult
 sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=4  scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_4cpu
 sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=8  scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_8cpu
 sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=16 scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_16cpu
-sbatch "${COMMON[@]}"        --cpus-per-task=16 scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_16cpu_gpu

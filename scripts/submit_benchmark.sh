@@ -43,6 +43,8 @@ sleep 2
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Low-LogLoss-GPU
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Medium-LogLoss-GPU
 sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-High-LogLoss-GPU
+sleep 2
+sbatch "${COMMON2[@]}" --time=08:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV4-Best-LogLoss-GPU
 
 #sbatch --cpus-per-task=4 --mem=32G --array=0-5 --time=72:00:00 --time-min=01:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Low-LogLoss-GPU
 #sbatch --cpus-per-task=4 --mem=32G --array=0-5 --time=72:00:00 --time-min=01:00:00 --gres=gpu:1 scripts/run_benchmark2.slurm -c TSCGlueEnhancedV2-Medium-Accuracy-GPU

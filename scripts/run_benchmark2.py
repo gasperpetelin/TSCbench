@@ -65,6 +65,8 @@ AVAILABLE_CLASSIFIERS = [
     "TSCGlueEnhancedV4-Medium-LogLoss-GPU",
     "TSCGlueEnhancedV4-High-Accuracy-GPU",
     "TSCGlueEnhancedV4-High-LogLoss-GPU",
+    # `best` serves its meta stacker for every eval_metric, so one run covers it.
+    "TSCGlueEnhancedV4-Best-LogLoss-GPU",
 ]
 
 
