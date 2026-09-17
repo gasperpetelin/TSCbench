@@ -1,6 +1,7 @@
 #!/bin/bash
 # Timing sweep: TSCGlueEnhancedV4-LogLoss (Low/Medium/High) and MultiRocketHydra
-# at 1/4/8/16 CPUs, plus a 16-CPU + GPU run for each. Fold 0, all UCR.
+# at 1/4/8/16 CPUs, plus a 16-CPU + GPU run for each TSCGlue config, and HIVECOTEV2
+# at 1 CPU only. Fold 0, all UCR.
 #
 # Every job requests a GPU -- these nodes will not schedule without one -- so the
 # CPU-only configs get TIMING_NO_GPU=1 and blank CUDA_VISIBLE_DEVICES in the job.
@@ -33,3 +34,8 @@ sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=1  scripts/run_timing.slurm -c Mult
 sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=4  scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_4cpu
 sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=8  scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_8cpu
 sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=16 scripts/run_timing.slurm -c MultiRocketHydra                     -o $O/mrhydra_16cpu
+
+# HC2 is CPU-only and runs at 1 core only, as in submit_benchmark.sh -- no GPU
+# variant and no CPU-count sweep. Far slower than anything else here, so this is
+# the job at risk of hitting the 72h wall.
+sbatch "${COMMON[@]}" $NOGPU --cpus-per-task=1  scripts/run_timing.slurm -c HIVECOTEV2                          -o $O/hc2_1cpu
