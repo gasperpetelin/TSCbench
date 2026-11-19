@@ -48,6 +48,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 _DEFAULT_DATA = str(PROJECT_ROOT / "data")
 
+# Ablation: the 12 L1 base models of the `high` preset, each fitted standalone.
+from tscbench.base_models import BASE_MODELS, BaseModel
+
 AVAILABLE_CLASSIFIERS = [
     "ROCKET",
     "MiniRocket",
@@ -68,24 +71,32 @@ AVAILABLE_CLASSIFIERS = [
     # `best` serves its meta stacker for every eval_metric, so one run covers it.
     "TSCGlueEnhancedV4-Best-LogLoss-GPU",
 ]
+AVAILABLE_CLASSIFIERS += [f"Base-{m}" for m in BASE_MODELS]
 
 
 def make_classifier(name: str, random_state: int, n_jobs: int, runs_dir=None):
+    if name.startswith("Base-"):
+        # Base-<model>, e.g. Base-quant-etc. Standalone, does not touch tscglue.
+        return BaseModel(name[len("Base-"):], random_state=random_state, n_jobs=n_jobs)
+
     # tscglue models write fold-model pickles and feature caches under
     # `<runs_dir>/<run_id>/`, defaulting to ./tscglue_runs. Only the feature caches
     # are cleaned up on their own; the pickles are not. `runs_dir` points them at a
     # per-experiment temp dir so the caller can delete the lot in one go.
     from tscglue.models import TSCGlueClassifier, TSCGlueEnhancedV4
 
-    if name.startswith("TSCGlueEnhancedV4-") and name.endswith("-GPU"):
-        # TSCGlueEnhancedV4-<Preset>-<Metric>-GPU, e.g. TSCGlueEnhancedV4-High-LogLoss-GPU.
+    if name.startswith("TSCGlueEnhancedV4-") and "-GPU" in name:
+        # TSCGlueEnhancedV4-<Preset>-<Metric>-GPU[-R<n>], e.g. TSCGlueEnhancedV4-High-LogLoss-GPU.
+        # The optional -R<n> sets n_repetitions (repeated level-0 CV splits), default 1.
         import torch
-        _preset, _metric = name[len("TSCGlueEnhancedV4-"):-len("-GPU")].split("-")
+        _base, _, _reps = name.partition("-GPU")
+        _preset, _metric = _base[len("TSCGlueEnhancedV4-"):].split("-")
         _metric_map = {"Accuracy": "accuracy", "F1": "f1", "LogLoss": "log_loss", "ROCAUC": "roc_auc"}
         return TSCGlueEnhancedV4(
             verbose=10, random_state=random_state, n_jobs=n_jobs,
             n_gpus=torch.cuda.device_count(),
             eval_metric=_metric_map[_metric], preset=_preset.lower(),
+            n_repetitions=int(_reps.removeprefix("-R")) if _reps else 1,
             runs_dir=runs_dir,
             # Cap cases in flight at predict time so peak RAM and run-dir disk
             # scale with the batch rather than with len(X).

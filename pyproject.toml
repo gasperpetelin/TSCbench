@@ -26,6 +26,9 @@ dependencies = [
     "tscglue"
 ]
 
+[project.scripts]
+tscbench-run = "tscbench.run_model:main"
+
 [tool.uv.sources]
 tscglue = { git = "https://github.com/gasperpetelin/TSCGlue", branch = "main" }
 tsml-eval = { git = "https://github.com/time-series-machine-learning/tsml-eval", branch = "main" }

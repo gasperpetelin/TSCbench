@@ -209,3 +209,5 @@ __marimo__/
 # Data
 data/
 artifacts/
+model_results*/
+tscbench_runs/
