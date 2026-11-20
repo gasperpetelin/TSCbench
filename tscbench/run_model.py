@@ -156,11 +156,16 @@ def parse_resamples(text):
 
 
 def parse_datasets(values):
-    """['ucr:Beef,ucr:Coffee', ...] -> [('ucr', 'Beef'), ('ucr', 'Coffee')]."""
+    """['ucr:Beef,ucr:Coffee', ...] -> [('ucr', 'Beef'), ('ucr', 'Coffee')]; 'ucr' -> all of ucr."""
     out = []
     for value in values:
         for item in filter(None, (x.strip() for x in value.split(","))):
             source, sep, name = item.partition(":")
+            if source in DATA_DIRS and not name:
+                out.extend(
+                    (source, d.name) for d in sorted(DATA_DIRS[source].iterdir()) if d.is_dir()
+                )
+                continue
             if not sep or source not in DATA_DIRS or not name:
                 raise SystemExit(
                     f"dataset {item!r} is not <source>:<name>, source one of {list(DATA_DIRS)}"
@@ -261,7 +266,8 @@ def main():
         "--datasets",
         action="append",
         required=True,
-        help="<source>:<name>, comma-separated or repeated, e.g. ucr:Beef,ucr:Coffee",
+        help="<source>:<name>, comma-separated or repeated, e.g. ucr:Beef,ucr:Coffee; "
+        "<source> alone for all its datasets, e.g. ucr",
     )
     ap.add_argument("-r", "--resamples", default="0-9", help="e.g. 0-9 or 0,3,5 (default 0-9)")
     ap.add_argument("--name", help="results name (default: Class-<commit|version>-<params hash>)")
