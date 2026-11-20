@@ -22,7 +22,7 @@ dependencies = [
     "psutil",
     "numpy<2.4",
     "tsml-eval",
-    "aeon>=1.5.0,<1.6.0",
+    "aeon>=1.6.0",
     "tscglue"
 ]
 
