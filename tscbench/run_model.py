@@ -16,8 +16,11 @@ locally, records what ran in run_info.txt, and deletes the venv at the end.
 
 Results: <output-dir>/<name>/Predictions/<dataset>/testResample<k>.csv, run_info.txt and one log
 per run in <output-dir>/<name>/. Existing results are skipped unless --overwrite.
+<output-dir> can be s3://bucket/prefix: each run is written to a local temp dir and uploaded
+(results file and log) when it ends; AWS credentials and AWS_ENDPOINT_URL come from the environment.
 Runs go in random order and each one is locked while it runs, so several copies of the same
-command can work through the runs together.
+command can work through the runs together (with S3, only copies on the same machine share locks;
+copies elsewhere only skip runs whose results are already uploaded).
 The model gets random_state=<resample> and runs_dir=<temp dir> when its __init__ takes them;
 everything else (n_jobs, n_gpus, ...) comes from -p. Values are Python literals (True, 8, 0.5,
 "x"); anything else is a string.
@@ -208,6 +211,16 @@ def build_env(env_dir, spec, extra_packages):
     return python, freeze
 
 
+def s3_exists(s3, bucket, key):
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+        return True
+    except s3.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+            return False
+        raise
+
+
 def gpu_name():
     try:
         return (
@@ -256,7 +269,7 @@ def main():
         "-o",
         "--output-dir",
         default=str(PROJECT_ROOT / "tscbench_runs"),
-        help="default: TSCbench/tscbench_runs",
+        help="local dir or s3://bucket/prefix (default: TSCbench/tscbench_runs)",
     )
     ap.add_argument(
         "--overwrite",
@@ -287,28 +300,57 @@ def main():
     name = args.name or f"{cls_name}-{label}-{params_hash}"
     datasets = parse_datasets(args.datasets)
     resamples = parse_resamples(args.resamples)
-    results = Path(args.output_dir) / name
+    s3 = None
+    if args.output_dir.startswith("s3://"):
+        import boto3
+
+        s3 = boto3.client("s3")
+        bucket, _, prefix = args.output_dir.removeprefix("s3://").partition("/")
+        key_root = f"{prefix.strip('/')}/{name}".lstrip("/")
+        pages = s3.get_paginator("list_objects_v2").paginate(
+            Bucket=bucket, Prefix=f"{key_root}/Predictions/"
+        )
+        uploaded = {
+            o["Key"].removeprefix(f"{key_root}/") for p in pages for o in p.get("Contents", [])
+        }
+        results_url = f"s3://{bucket}/{key_root}"
+    else:
+        results_url = Path(args.output_dir) / name
+
+    def is_done(dataset, resample, fresh=False):
+        rel = f"Predictions/{dataset}/testResample{resample}.csv"
+        if s3 is None:
+            return (results_url / rel).exists()
+        return s3_exists(s3, bucket, f"{key_root}/{rel}") if fresh else rel in uploaded
+
     runs = [
-        (s, d, r)
-        for s, d in datasets
-        for r in resamples
-        if args.overwrite or not (results / "Predictions" / d / f"testResample{r}.csv").exists()
+        (s, d, r) for s, d in datasets for r in resamples if args.overwrite or not is_done(d, r)
     ]
     random.shuffle(runs)
     print(f"{name}: {spec}  {args.model}  {args.param}")
     print(
-        f"{len(runs)} of {len(datasets) * len(resamples)} runs to do, results in {results}",
+        f"{len(runs)} of {len(datasets) * len(resamples)} runs to do, results in {results_url}",
         flush=True,
     )
     if not runs:
         return
+
+    if s3 is None:
+        results, lock_dir = results_url, results_url / "locks"
+    else:  # stage locally, upload each run as it ends; locks shared by copies on this machine
+        results = Path(tempfile.mkdtemp(prefix="tscbench-run-out-")) / name
+        lock_dir = Path(tempfile.gettempdir()) / "tscbench-run-locks" / name
+
+    def upload(rel):
+        if s3 is not None and (results / rel).exists():
+            s3.upload_file(str(results / rel), bucket, f"{key_root}/{rel}")
 
     env_dir = Path(tempfile.mkdtemp(prefix="tscbench-run-env-"))
     try:
         print(f"building venv in {env_dir}", flush=True)
         python, freeze = build_env(env_dir, spec, args.with_packages)
         (results / "logs").mkdir(parents=True, exist_ok=True)
-        (results / "locks").mkdir(exist_ok=True)
+        lock_dir.mkdir(parents=True, exist_ok=True)
         (results / "run_info.txt").write_text(
             f"date: {datetime.now():%Y-%m-%d %H:%M:%S}\nhost: {socket.gethostname()}\n"
             f"gpu: {gpu_name()}\npython: {platform.python_version()} (venv {PYTHON})\n"
@@ -318,6 +360,7 @@ def main():
             f"datasets: {','.join(f'{s}:{d}' for s, d in datasets)}\nresamples: {args.resamples}\n"
             f"\n# venv packages\n{freeze}"
         )
+        upload("run_info.txt")
         run_env = os.environ | {
             "HF_HUB_OFFLINE": "1",
             "OMP_NUM_THREADS": "1",
@@ -328,15 +371,14 @@ def main():
         ok, skipped = [], 0
         for source, dataset, resample in runs:
             # another copy may be running it (lock held) or have finished it since we started
-            lock = open(results / "locks" / f"{dataset}_{resample}.lock", "w")
+            lock = open(lock_dir / f"{dataset}_{resample}.lock", "w")
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 lock.close()
                 skipped += 1
                 continue
-            done = results / "Predictions" / dataset / f"testResample{resample}.csv"
-            if not args.overwrite and done.exists():
+            if not args.overwrite and is_done(dataset, resample, fresh=True):
                 lock.close()
                 skipped += 1
                 continue
@@ -353,7 +395,7 @@ def main():
                 "--resample",
                 str(resample),
                 "--output-dir",
-                args.output_dir,
+                str(results.parent),
                 "--data-dir",
                 str(DATA_DIRS[source]),
                 *[x for p in args.param for x in ("-p", p)],
@@ -362,6 +404,8 @@ def main():
                 code = subprocess.run(
                     cmd, env=run_env, stdout=log, stderr=subprocess.STDOUT
                 ).returncode
+            upload(f"Predictions/{dataset}/testResample{resample}.csv")
+            upload(f"logs/{dataset}_{resample}.log")
             lock.close()
             print(
                 f"{'ok  ' if code == 0 else 'FAIL'} {source}:{dataset} resample={resample}",
@@ -370,10 +414,12 @@ def main():
             ok.append(code == 0)
         print(
             f"done: {sum(ok)} ok, {len(ok) - sum(ok)} failed, {skipped} done or running elsewhere "
-            f"(logs in {results / 'logs'})"
+            f"(logs in {results_url}/logs)"
         )
         sys.exit(0 if all(ok) else 1)
     finally:
+        if s3 is not None:
+            shutil.rmtree(results.parent, ignore_errors=True)
         if args.keep_env:
             print(f"kept venv {env_dir}")
         else:
