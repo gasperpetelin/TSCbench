@@ -310,10 +310,13 @@ def main():
     if args.output_dir.startswith("s3://"):
         import boto3
 
-        s3 = boto3.client("s3")
+        # fresh session per call re-reads credentials, so refreshed ones (ada) are picked up
+        def s3():
+            return boto3.Session().client("s3")
+
         bucket, _, prefix = args.output_dir.removeprefix("s3://").partition("/")
         key_root = f"{prefix.strip('/')}/{name}".lstrip("/")
-        pages = s3.get_paginator("list_objects_v2").paginate(
+        pages = s3().get_paginator("list_objects_v2").paginate(
             Bucket=bucket, Prefix=f"{key_root}/Predictions/"
         )
         uploaded = {
@@ -327,7 +330,7 @@ def main():
         rel = f"Predictions/{dataset}/testResample{resample}.csv"
         if s3 is None:
             return (results_url / rel).exists()
-        return s3_exists(s3, bucket, f"{key_root}/{rel}") if fresh else rel in uploaded
+        return s3_exists(s3(), bucket, f"{key_root}/{rel}") if fresh else rel in uploaded
 
     runs = [
         (s, d, r) for s, d in datasets for r in resamples if args.overwrite or not is_done(d, r)
@@ -349,7 +352,7 @@ def main():
 
     def upload(rel):
         if s3 is not None and (results / rel).exists():
-            s3.upload_file(str(results / rel), bucket, f"{key_root}/{rel}")
+            s3().upload_file(str(results / rel), bucket, f"{key_root}/{rel}")
 
     env_dir = Path(tempfile.mkdtemp(prefix="tscbench-run-env-"))
     try:
