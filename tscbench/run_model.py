@@ -371,7 +371,6 @@ def main():
         )
         upload("run_info.txt")
         run_env = os.environ | {
-            "HF_HUB_OFFLINE": "1",
             "OMP_NUM_THREADS": "1",
             "MKL_NUM_THREADS": "1",
             "OPENBLAS_NUM_THREADS": "1",
