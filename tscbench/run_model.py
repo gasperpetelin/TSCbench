@@ -370,11 +370,6 @@ def main():
             f"\n# venv packages\n{freeze}"
         )
         upload("run_info.txt")
-        run_env = os.environ | {
-            "OMP_NUM_THREADS": "1",
-            "MKL_NUM_THREADS": "1",
-            "OPENBLAS_NUM_THREADS": "1",
-        }
 
         ok, skipped = [], 0
         for source, dataset, resample in runs:
@@ -410,7 +405,7 @@ def main():
             ]
             with open(results / "logs" / f"{dataset}_{resample}.log", "w") as log:
                 code = subprocess.run(
-                    cmd, env=run_env, stdout=log, stderr=subprocess.STDOUT
+                    cmd, stdout=log, stderr=subprocess.STDOUT
                 ).returncode
             upload(f"Predictions/{dataset}/testResample{resample}.csv")
             upload(f"logs/{dataset}_{resample}.log")
